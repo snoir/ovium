@@ -12,13 +12,14 @@ fn main() {
     opts.optopt("s", "", "server socket path", "sock");
     opts.optopt("c", "", "remote command to launch", "command");
     opts.optopt("n", "", "nodes to manage", "nodes");
+    opts.optflag("p", "", "send ping to ovium server");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => panic!(f.to_string()),
     };
 
-    if matches.opt_present("h") {
+    if matches.opt_present("h") || args.len() < 2 {
         print_usage(&program_name, opts);
         process::exit(0);
     }
@@ -27,8 +28,19 @@ fn main() {
         s
     } else {
         println!("socket path is required!");
-        process::exit(0);
+        process::exit(1);
     };
+
+    if matches.opt_present("p") {
+        let client = Client {
+            socket: socket_path,
+            payload: Payload::Ping {
+                content: "Hello from Ovium client!".to_string(),
+            },
+        };
+        client.run();
+        process::exit(0);
+    }
 
     if let Some(c) = matches.opt_str("c") {
         if let Some(n) = matches.opt_str("n") {
@@ -43,7 +55,7 @@ fn main() {
             client.run();
         } else {
             println!("nodes list is required!");
-            process::exit(0);
+            process::exit(1);
         }
     }
 }
