@@ -21,12 +21,6 @@ impl Client {
             String::from_utf8(resp).unwrap().trim()
         );
 
-        let _ping = Payload::Ping {
-            content: "Ping to server".to_string(),
-        };
-
-        let cmd = &self.payload;
-
-        writer.write_all(&cmd.format_bytes()).unwrap();
+        writer.write_all(&self.payload.format_bytes()).unwrap();
     }
 }

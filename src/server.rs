@@ -90,6 +90,7 @@ impl Server<'_> {
     }
 
     fn handle_cmd(stream: &UnixStream, hosts: Vec<String>, content: String) {
+        info!("Sending command {} over ssh to node list", &content);
         for host in hosts {
             thread::scope(|s| {
                 s.spawn(|_| {
@@ -97,9 +98,8 @@ impl Server<'_> {
                     let mut sess = Session::new().unwrap();
                     sess.set_tcp_stream(tcp);
                     sess.handshake().expect("fail");
-                    sess.userauth_agent("samir").expect("fail");
+                    sess.userauth_agent("root").expect("fail");
                     let mut channel = sess.channel_session().expect("fail");
-                    println!("toto");
                     channel.exec(&content).expect("fail");
                     let mut s = String::new();
                     channel.read_to_string(&mut s).unwrap();
