@@ -7,11 +7,6 @@ pub enum Message {
     Hello { content: String },
 }
 
-pub struct ClientOptions {
-    pub socket: String,
-    pub msg: Message,
-}
-
 impl Message {
     pub fn from_slice(slice: Vec<u8>) -> Self {
         let msg: Message = serde_json::from_slice(&slice).unwrap();
