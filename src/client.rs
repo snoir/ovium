@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 
 pub struct Client {
     pub socket: String,
-    pub msg: Message,
+    pub payload: Payload,
 }
 
 impl Client {
@@ -21,11 +21,11 @@ impl Client {
             String::from_utf8(resp).unwrap().trim()
         );
 
-        let _ping = Message::Ping {
+        let _ping = Payload::Ping {
             content: "Ping to server".to_string(),
         };
 
-        let cmd = &self.msg;
+        let cmd = &self.payload;
 
         writer.write_all(&cmd.format_bytes()).unwrap();
     }

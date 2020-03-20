@@ -35,7 +35,7 @@ fn main() {
             let nodes: Vec<String> = n.split(',').map(String::from).collect();
             let client = Client {
                 socket: socket_path,
-                msg: Message::Cmd {
+                payload: Payload::Cmd {
                     hosts: nodes,
                     content: c,
                 },

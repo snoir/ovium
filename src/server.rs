@@ -45,11 +45,11 @@ impl Server<'_> {
         let mut reader = BufReader::new(&stream);
         let mut writer = BufWriter::new(&stream);
 
-        let hello_msg = Message::Hello {
+        let hello_payload = Payload::Hello {
             content: "Hello from Ovium server!".to_string(),
         };
 
-        writer.write_all(&hello_msg.format_bytes()).unwrap();
+        writer.write_all(&hello_payload.format_bytes()).unwrap();
         writer.flush().unwrap();
 
         loop {
@@ -61,13 +61,13 @@ impl Server<'_> {
                         info!("connection closed by remote");
                         break;
                     } else {
-                        let recv_msg = Message::from_slice(resp);
-                        match recv_msg {
-                            Message::Cmd { hosts, content } => {
+                        let recv_payload = Payload::from_slice(resp);
+                        match recv_payload {
+                            Payload::Cmd { hosts, content } => {
                                 self::Server::handle_cmd(&stream, hosts, content)
                             }
-                            Message::Hello { .. } => info!("Hello"),
-                            Message::Ping { .. } => self::Server::handle_ping(&stream),
+                            Payload::Hello { .. } => info!("Hello"),
+                            Payload::Ping { .. } => self::Server::handle_ping(&stream),
                         }
                         break;
                     };
@@ -83,10 +83,10 @@ impl Server<'_> {
     fn handle_ping(stream: &UnixStream) {
         let mut writer = BufWriter::new(stream);
         info!("Ping received, replying pong!");
-        let hello_msg = Message::Hello {
+        let hello_payload = Payload::Hello {
             content: "Pong from server!".to_string(),
         };
-        writer.write_all(&hello_msg.format_bytes()).unwrap();
+        writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
     fn handle_cmd(stream: &UnixStream, hosts: Vec<String>, content: String) {
