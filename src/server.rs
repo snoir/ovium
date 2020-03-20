@@ -1,24 +1,41 @@
 use crate::types::*;
 use crossbeam_utils::thread;
 use log::info;
+use serde::{Deserialize, Serialize};
 use serde_json::Result;
 use ssh2::Session;
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::Path;
+use toml::Value;
 
+#[derive(Deserialize, Debug)]
 pub struct Server<'a> {
-    path: &'a str,
+    socket_path: &'a str,
+    config: ServerConfig,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ServerConfig {
+    nodes: HashMap<String, HashMap<String, String>>,
 }
 
 impl Server<'_> {
-    pub fn new(path: &str) -> Result<Server> {
-        Ok(Server { path })
+    pub fn new(socket_path: &str) -> Result<Server> {
+        let config_path = Path::new("/home/samir/git/ovium-config");
+        let server_config = ServerConfig::new(config_path).unwrap();
+        Ok(Server {
+            socket_path: socket_path,
+            config: server_config,
+        })
     }
 
     pub fn run(&self) -> io::Result<()> {
-        let listener = UnixListener::bind(&self.path).unwrap();
+        let listener = UnixListener::bind(&self.socket_path).unwrap();
 
         for stream in listener.incoming() {
             match stream {
@@ -110,5 +127,17 @@ impl Server<'_> {
             })
             .unwrap();
         }
+    }
+}
+
+impl ServerConfig {
+    pub fn new(config_dir: &Path) -> Result<ServerConfig> {
+        let mut config_string = String::new();
+        let node_path = config_dir.join("nodes.toml");
+
+        let mut f = File::open(node_path).unwrap();
+        f.read_to_string(&mut config_string).unwrap();
+        let nodes: ServerConfig = toml::from_str(&config_string).unwrap();
+        Ok(nodes)
     }
 }

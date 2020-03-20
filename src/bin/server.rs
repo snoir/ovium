@@ -22,6 +22,7 @@ fn main() {
 
     if let Some(s) = matches.opt_str("s") {
         let server = Server::new(&s).unwrap();
+        dbg!(&server);
         server.run().unwrap();
     } else {
         println!("socket option is required!");
