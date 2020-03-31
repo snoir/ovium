@@ -42,8 +42,8 @@ impl Server<'_> {
                 Ok(stream) => {
                     /* connection succeeded */
                     thread::scope(move |s| {
-                        s.spawn(|_| {
-                            self::Server::handle_client(stream);
+                        s.spawn(move |_| {
+                            self.handle_client(stream);
                         });
                     })
                     .unwrap();
@@ -58,7 +58,7 @@ impl Server<'_> {
         Ok(())
     }
 
-    fn handle_client(stream: UnixStream) {
+    fn handle_client(&self, stream: UnixStream) {
         let mut reader = BufReader::new(&stream);
         let mut writer = BufWriter::new(&stream);
 
@@ -81,10 +81,10 @@ impl Server<'_> {
                         let recv_payload = Payload::from_slice(resp);
                         match recv_payload {
                             Payload::Cmd { hosts, content } => {
-                                self::Server::handle_cmd(&stream, hosts, content)
+                                self.handle_cmd(&stream, hosts, content)
                             }
                             Payload::Hello { .. } => info!("Hello"),
-                            Payload::Ping { .. } => self::Server::handle_ping(&stream),
+                            Payload::Ping { .. } => self.handle_ping(&stream),
                         }
                         break;
                     };
@@ -97,7 +97,7 @@ impl Server<'_> {
         }
     }
 
-    fn handle_ping(stream: &UnixStream) {
+    fn handle_ping(&self, stream: &UnixStream) {
         let mut writer = BufWriter::new(stream);
         info!("Ping received, replying pong!");
         let hello_payload = Payload::Hello {
@@ -106,16 +106,19 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn handle_cmd(stream: &UnixStream, hosts: Vec<String>, content: String) {
-        info!("Sending command {} over ssh to node list", &content);
+    fn handle_cmd(&self, stream: &UnixStream, hosts: Vec<String>, content: String) {
         for host in hosts {
             thread::scope(|s| {
                 s.spawn(|_| {
-                    let tcp = TcpStream::connect(host).unwrap();
+                    let tcp = TcpStream::connect(format!(
+                        "{}:{}",
+                        &self.config.nodes[&host]["ip"], &self.config.nodes[&host]["port"]
+                    ))
+                    .unwrap();
                     let mut sess = Session::new().unwrap();
                     sess.set_tcp_stream(tcp);
                     sess.handshake().expect("fail");
-                    sess.userauth_agent("root").expect("fail");
+                    sess.userauth_agent("samir").expect("fail");
                     let mut channel = sess.channel_session().expect("fail");
                     channel.exec(&content).expect("fail");
                     let mut s = String::new();
