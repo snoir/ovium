@@ -1,8 +1,7 @@
 use crate::types::*;
 use crossbeam_utils::thread;
 use log::info;
-use serde::{Deserialize, Serialize};
-use serde_json::Result;
+use serde::Deserialize;
 use ssh2::Session;
 use std::collections::HashMap;
 use std::fs::File;
@@ -11,9 +10,9 @@ use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
-use toml::Value;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
 
-#[derive(Deserialize, Debug)]
 pub struct Server<'a> {
     socket_path: &'a str,
     config: ServerConfig,
@@ -24,8 +23,17 @@ pub struct ServerConfig {
     nodes: HashMap<String, HashMap<String, String>>,
 }
 
+#[derive(Debug)]
+pub struct CmdReturn {
+    stdout: Option<String>,
+    stderr: Option<String>,
+    exit_status: i32,
+}
+
+struct CmdError;
+
 impl Server<'_> {
-    pub fn new(socket_path: &str) -> Result<Server> {
+    pub fn new(socket_path: &str) -> Result<Server, io::Error> {
         let config_path = Path::new("/home/samir/git/ovium-config");
         let server_config = ServerConfig::new(config_path).unwrap();
         Ok(Server {
@@ -80,8 +88,8 @@ impl Server<'_> {
                     } else {
                         let recv_payload = Payload::from_slice(resp);
                         match recv_payload {
-                            Payload::Cmd { hosts, content } => {
-                                self.handle_cmd(&stream, hosts, content)
+                            Payload::Cmd { nodes, content } => {
+                                self.handle_cmd(&stream, nodes, content)
                             }
                             Payload::Hello { .. } => info!("Hello"),
                             Payload::Ping { .. } => self.handle_ping(&stream),
@@ -106,40 +114,83 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn handle_cmd(&self, stream: &UnixStream, hosts: Vec<String>, content: String) {
-        for host in hosts {
-            thread::scope(|s| {
-                s.spawn(|_| {
-                    let tcp = TcpStream::connect(format!(
-                        "{}:{}",
-                        &self.config.nodes[&host]["ip"], &self.config.nodes[&host]["port"]
-                    ))
-                    .unwrap();
-                    let mut sess = Session::new().unwrap();
-                    sess.set_tcp_stream(tcp);
-                    sess.handshake().expect("fail");
-                    sess.userauth_agent("samir").expect("fail");
-                    let mut channel = sess.channel_session().expect("fail");
-                    channel.exec(&content).expect("fail");
-                    let mut s = String::new();
-                    channel.read_to_string(&mut s).unwrap();
-                    println!("{}", s);
-                    channel.wait_close().unwrap();
-                    println!("{}", channel.exit_status().unwrap());
-                });
-            })
-            .unwrap();
+    fn execute_cmd(node_addr: String, cmd: String) -> CmdReturn {
+        let tcp = if let Ok(tcp) = TcpStream::connect(node_addr) {
+            tcp
+        } else {
+            return (CmdReturn {
+                stdout: None,
+                stderr: None,
+                exit_status: 0,
+            });
+        };
+        let mut sess = Session::new().unwrap();
+        sess.set_tcp_stream(tcp);
+        sess.handshake().expect("fail");
+        sess.userauth_agent("root").expect("fail");
+        let mut channel = sess.channel_session().expect("fail");
+        channel.exec(&cmd).expect("fail");
+        let mut stdout_string = String::new();
+        let mut stderr_string = String::new();
+        channel.read_to_string(&mut stdout_string).unwrap();
+        channel.stderr().read_to_string(&mut stderr_string).unwrap();
+        channel.wait_close().unwrap();
+
+        let stderr = if stderr_string.is_empty() {
+            None
+        } else {
+            Some(stderr_string)
+        };
+
+        let stdout = if stdout_string.is_empty() {
+            None
+        } else {
+            Some(stdout_string)
+        };
+
+        let exit_status = channel.exit_status().unwrap();
+
+        CmdReturn {
+            stdout,
+            stderr,
+            exit_status,
         }
+    }
+
+    fn handle_cmd(&self, stream: &UnixStream, nodes: Vec<String>, cmd: String) {
+        let (tx, rx) = channel();
+        thread::scope(move |s| {
+            let mut threads = Vec::new();
+            for node in nodes {
+                let node_tx = tx.clone();
+                let node_cmd = cmd.clone();
+                let node_thread = s.spawn(move |_| {
+                    let node_addr = format!(
+                        "{}:{}",
+                        &self.config.nodes[&node]["ip"], &self.config.nodes[&node]["port"]
+                    );
+                    let cmd_return = self::Server::execute_cmd(node_addr, node_cmd);
+                    node_tx.send(cmd_return).unwrap();
+                });
+                threads.push(node_thread);
+            }
+            let mut results: Vec<CmdReturn> = Vec::new();
+            for _ in 0..threads.len().clone() {
+                results.push(rx.recv().unwrap());
+            }
+            dbg!(&results);
+        })
+        .unwrap();
     }
 }
 
 impl ServerConfig {
-    pub fn new(config_dir: &Path) -> Result<ServerConfig> {
+    pub fn new(config_dir: &Path) -> Result<ServerConfig, io::Error> {
         let mut config_string = String::new();
         let node_path = config_dir.join("nodes.toml");
 
-        let mut f = File::open(node_path).unwrap();
-        f.read_to_string(&mut config_string).unwrap();
+        let mut f = File::open(node_path)?;
+        f.read_to_string(&mut config_string)?;
         let nodes: ServerConfig = toml::from_str(&config_string).unwrap();
         Ok(nodes)
     }

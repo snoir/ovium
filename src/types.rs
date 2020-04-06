@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Payload {
-    Cmd { hosts: Vec<String>, content: String },
+    Cmd { nodes: Vec<String>, content: String },
     Ping { content: String },
     Hello { content: String },
 }

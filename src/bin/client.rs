@@ -48,7 +48,7 @@ fn main() {
             let client = Client {
                 socket: socket_path,
                 payload: Payload::Cmd {
-                    hosts: nodes,
+                    nodes: nodes,
                     content: c,
                 },
             };
