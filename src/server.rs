@@ -1,3 +1,4 @@
+use crate::error::CmdError;
 use crate::types::*;
 use crossbeam_utils::thread;
 use log::info;
@@ -11,7 +12,6 @@ use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
 
 pub struct Server<'a> {
     socket_path: &'a str,
@@ -30,12 +30,10 @@ pub struct CmdReturn {
     exit_status: i32,
 }
 
-struct CmdError;
-
 impl Server<'_> {
     pub fn new(socket_path: &str) -> Result<Server, io::Error> {
         let config_path = Path::new("/home/samir/git/ovium-config");
-        let server_config = ServerConfig::new(config_path).unwrap();
+        let server_config = ServerConfig::new(config_path)?;
         Ok(Server {
             socket_path: socket_path,
             config: server_config,
@@ -43,7 +41,7 @@ impl Server<'_> {
     }
 
     pub fn run(&self) -> io::Result<()> {
-        let listener = UnixListener::bind(&self.socket_path).unwrap();
+        let listener = UnixListener::bind(&self.socket_path)?;
 
         for stream in listener.incoming() {
             match stream {
@@ -51,7 +49,7 @@ impl Server<'_> {
                     /* connection succeeded */
                     thread::scope(move |s| {
                         s.spawn(move |_| {
-                            self.handle_client(stream);
+                            self.handle_client(stream).unwrap();
                         });
                     })
                     .unwrap();
@@ -66,7 +64,7 @@ impl Server<'_> {
         Ok(())
     }
 
-    fn handle_client(&self, stream: UnixStream) {
+    fn handle_client(&self, stream: UnixStream) -> io::Result<()> {
         let mut reader = BufReader::new(&stream);
         let mut writer = BufWriter::new(&stream);
 
@@ -74,8 +72,8 @@ impl Server<'_> {
             content: "Hello from Ovium server!".to_string(),
         };
 
-        writer.write_all(&hello_payload.format_bytes()).unwrap();
-        writer.flush().unwrap();
+        writer.write_all(&hello_payload.format_bytes())?;
+        writer.flush()?;
 
         loop {
             let mut resp = Vec::new();
@@ -103,6 +101,7 @@ impl Server<'_> {
                 },
             }
         }
+        Ok(())
     }
 
     fn handle_ping(&self, stream: &UnixStream) {
@@ -114,27 +113,19 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn execute_cmd(node_addr: String, cmd: String) -> CmdReturn {
-        let tcp = if let Ok(tcp) = TcpStream::connect(node_addr) {
-            tcp
-        } else {
-            return (CmdReturn {
-                stdout: None,
-                stderr: None,
-                exit_status: 0,
-            });
-        };
-        let mut sess = Session::new().unwrap();
+    fn execute_cmd(node_addr: String, cmd: String) -> Result<CmdReturn, CmdError> {
+        let tcp = TcpStream::connect(node_addr)?;
+        let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
-        sess.handshake().expect("fail");
-        sess.userauth_agent("root").expect("fail");
-        let mut channel = sess.channel_session().expect("fail");
-        channel.exec(&cmd).expect("fail");
+        sess.handshake()?;
+        sess.userauth_agent("root")?;
+        let mut channel = sess.channel_session()?;
+        channel.exec(&cmd)?;
         let mut stdout_string = String::new();
         let mut stderr_string = String::new();
-        channel.read_to_string(&mut stdout_string).unwrap();
-        channel.stderr().read_to_string(&mut stderr_string).unwrap();
-        channel.wait_close().unwrap();
+        channel.read_to_string(&mut stdout_string)?;
+        channel.stderr().read_to_string(&mut stderr_string)?;
+        channel.wait_close()?;
 
         let stderr = if stderr_string.is_empty() {
             None
@@ -148,13 +139,13 @@ impl Server<'_> {
             Some(stdout_string)
         };
 
-        let exit_status = channel.exit_status().unwrap();
+        let exit_status = channel.exit_status()?;
 
-        CmdReturn {
+        Ok(CmdReturn {
             stdout,
             stderr,
             exit_status,
-        }
+        })
     }
 
     fn handle_cmd(&self, stream: &UnixStream, nodes: Vec<String>, cmd: String) {
@@ -174,7 +165,7 @@ impl Server<'_> {
                 });
                 threads.push(node_thread);
             }
-            let mut results: Vec<CmdReturn> = Vec::new();
+            let mut results: Vec<Result<CmdReturn, CmdError>> = Vec::new();
             for _ in 0..threads.len().clone() {
                 results.push(rx.recv().unwrap());
             }
@@ -191,7 +182,7 @@ impl ServerConfig {
 
         let mut f = File::open(node_path)?;
         f.read_to_string(&mut config_string)?;
-        let nodes: ServerConfig = toml::from_str(&config_string).unwrap();
+        let nodes: ServerConfig = toml::from_str(&config_string)?;
         Ok(nodes)
     }
 }

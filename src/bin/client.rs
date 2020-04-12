@@ -2,9 +2,9 @@ use getopts::Options;
 use ovium::client::Client;
 use ovium::types::*;
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
-use std::{env, process};
+use std::{env, io, process};
 
-fn main() {
+fn main() -> io::Result<()> {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap();
     let args: Vec<_> = env::args().collect();
     let program_name = args[0].clone();
@@ -38,7 +38,7 @@ fn main() {
                 content: "Hello from Ovium client!".to_string(),
             },
         };
-        client.run();
+        client.run()?;
         process::exit(0);
     }
 
@@ -52,12 +52,13 @@ fn main() {
                     content: c,
                 },
             };
-            client.run();
+            client.run()?;
         } else {
             println!("nodes list is required!");
             process::exit(1);
         }
     }
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: Options) {
