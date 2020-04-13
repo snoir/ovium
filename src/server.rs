@@ -1,7 +1,7 @@
-use crate::error::CmdError;
+use crate::error::Error;
 use crate::types::*;
 use crossbeam_utils::thread;
-use log::info;
+use log::{info, warn};
 use serde::Deserialize;
 use ssh2::Session;
 use std::collections::HashMap;
@@ -84,6 +84,7 @@ impl Server<'_> {
                             }
                             Payload::Hello { .. } => info!("Hello"),
                             Payload::Ping { .. } => self.handle_ping(&stream),
+                            _ => warn!("Unhandled type!"),
                         }
                         break;
                     };
@@ -106,7 +107,7 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn execute_cmd(node_addr: String, cmd: String) -> Result<CmdReturn, CmdError> {
+    fn execute_cmd(node_addr: String, cmd: String) -> Result<CmdReturn, Error> {
         let tcp = TcpStream::connect(node_addr)?;
         let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
@@ -158,7 +159,7 @@ impl Server<'_> {
                 });
                 threads.push(node_thread);
             }
-            let mut results: Vec<Result<CmdReturn, CmdError>> = Vec::new();
+            let mut results: Vec<Result<CmdReturn, Error>> = Vec::new();
             for _ in 0..threads.len().clone() {
                 results.push(rx.recv().unwrap());
             }

@@ -1,29 +1,30 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io;
 
-#[derive(Debug)]
-pub enum CmdError {
-    Ssh(ssh2::Error),
-    Io(io::Error),
+#[derive(Serialize, Deserialize, Debug)]
+pub enum Error {
+    Ssh(String),
+    Io(String),
 }
 
-impl From<io::Error> for CmdError {
+impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
-        CmdError::Io(error)
+        Error::Io(error.to_string())
     }
 }
 
-impl From<ssh2::Error> for CmdError {
+impl From<ssh2::Error> for Error {
     fn from(error: ssh2::Error) -> Self {
-        CmdError::Ssh(error)
+        Error::Ssh(error.to_string())
     }
 }
 
-impl fmt::Display for CmdError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let err_msg = match self {
-            CmdError::Ssh(value) => format!("Ssh error: {}", value.to_string()),
-            CmdError::Io(value) => format!("I/O error: {}", value.to_string()),
+            Error::Ssh(value) => format!("Ssh error: {}", value),
+            Error::Io(value) => format!("I/O error: {}", value),
         };
 
         write!(f, "{}", err_msg)
