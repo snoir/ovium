@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CmdReturn {
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+    pub exit_status: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Payload {
     Cmd { nodes: Vec<String>, content: String },
     Ping { content: String },

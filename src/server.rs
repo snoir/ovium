@@ -23,13 +23,6 @@ pub struct ServerConfig {
     nodes: HashMap<String, HashMap<String, String>>,
 }
 
-#[derive(Debug)]
-pub struct CmdReturn {
-    stdout: Option<String>,
-    stderr: Option<String>,
-    exit_status: i32,
-}
-
 impl Server<'_> {
     pub fn new(socket_path: &str) -> Result<Server, io::Error> {
         let config_path = Path::new("/home/samir/git/ovium-config");
