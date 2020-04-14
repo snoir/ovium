@@ -8,6 +8,12 @@ pub enum Error {
     Io(String),
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CmdError {
+    node_name: String,
+    error: Error,
+}
+
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         Error::Io(error.to_string())

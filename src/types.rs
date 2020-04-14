@@ -8,6 +8,7 @@ pub struct CmdReturn {
     pub exit_status: i32,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CmdResponse {
     pub success: Vec<CmdReturn>,
     pub error: Vec<Error>,
@@ -20,6 +21,18 @@ pub enum Payload {
     Hello { content: String },
     CmdReturn(CmdReturn),
     Error(Error),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Node {
+    pub ip: String,
+    pub port: i32,
+    #[serde(default = "default_user")]
+    pub user: String,
+}
+
+fn default_user() -> String {
+    "root".to_string()
 }
 
 impl Payload {

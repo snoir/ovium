@@ -20,7 +20,7 @@ pub struct Server<'a> {
 
 #[derive(Deserialize, Debug)]
 pub struct ServerConfig {
-    nodes: HashMap<String, HashMap<String, String>>,
+    nodes: HashMap<String, Node>,
 }
 
 impl Server<'_> {
@@ -107,12 +107,13 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn execute_cmd(node_addr: String, cmd: String) -> Result<CmdReturn, Error> {
+    fn execute_cmd(node: &Node, cmd: String) -> Result<CmdReturn, Error> {
+        let node_addr = format!("{}:{}", node.ip, node.port);
         let tcp = TcpStream::connect(node_addr)?;
         let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
         sess.handshake()?;
-        sess.userauth_agent("root")?;
+        sess.userauth_agent(&node.user)?;
         let mut channel = sess.channel_session()?;
         channel.exec(&cmd)?;
         let mut stdout_string = String::new();
@@ -146,15 +147,13 @@ impl Server<'_> {
         let (tx, rx) = channel();
         thread::scope(move |s| {
             let mut threads = Vec::new();
-            for node in nodes {
+            for node_name in nodes {
                 let node_tx = tx.clone();
                 let node_cmd = cmd.clone();
                 let node_thread = s.spawn(move |_| {
-                    let node_addr = format!(
-                        "{}:{}",
-                        &self.config.nodes[&node]["ip"], &self.config.nodes[&node]["port"]
-                    );
-                    let cmd_return = self::Server::execute_cmd(node_addr, node_cmd);
+                    //TODO: work here! u known the node name!
+                    let cmd_return =
+                        self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
                     node_tx.send(cmd_return).unwrap();
                 });
                 threads.push(node_thread);
