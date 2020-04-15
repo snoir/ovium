@@ -107,7 +107,7 @@ impl Server<'_> {
         writer.write_all(&hello_payload.format_bytes()).unwrap();
     }
 
-    fn execute_cmd(node: &Node, cmd: String) -> Result<CmdReturn, Error> {
+    fn execute_cmd(node: &Node, cmd: String) -> Result<SshSuccess, Error> {
         let node_addr = format!("{}:{}", node.ip, node.port);
         let tcp = TcpStream::connect(node_addr)?;
         let mut sess = Session::new()?;
@@ -136,7 +136,7 @@ impl Server<'_> {
 
         let exit_status = channel.exit_status()?;
 
-        Ok(CmdReturn {
+        Ok(SshSuccess {
             stdout,
             stderr,
             exit_status,
@@ -152,13 +152,21 @@ impl Server<'_> {
                 let node_cmd = cmd.clone();
                 let node_thread = s.spawn(move |_| {
                     //TODO: work here! u known the node name!
-                    let cmd_return =
+                    let exec_return =
                         self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
+                    let ssh_return = match exec_return {
+                        Ok(ssh_return) => SshReturn::SshSuccess(ssh_return),
+                        Err(err) => SshReturn::SshFailure(err),
+                    };
+                    let cmd_return = CmdReturn {
+                        node_name: node_name,
+                        data: ssh_return,
+                    };
                     node_tx.send(cmd_return).unwrap();
                 });
                 threads.push(node_thread);
             }
-            let mut results: Vec<Result<CmdReturn, Error>> = Vec::new();
+            let mut results: Vec<CmdReturn> = Vec::new();
             for _ in 0..threads.len().clone() {
                 results.push(rx.recv().unwrap());
             }

@@ -3,6 +3,18 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdReturn {
+    pub node_name: String,
+    pub data: SshReturn,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum SshReturn {
+    SshSuccess(SshSuccess),
+    SshFailure(Error),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SshSuccess {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
     pub exit_status: i32,
