@@ -22,8 +22,7 @@ pub struct SshSuccess {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdResponse {
-    pub success: Vec<CmdReturn>,
-    pub error: Vec<Error>,
+    pub results: Vec<CmdReturn>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -47,14 +46,25 @@ fn default_user() -> String {
     "root".to_string()
 }
 
-impl Payload {
-    pub fn from_slice(slice: Vec<u8>) -> Self {
+pub trait Transport: serde::Serialize {
+    fn from_slice(slice: Vec<u8>) -> Self;
+
+    fn format_bytes(&self) -> Vec<u8> {
+        let slice = format!("{}\n", serde_json::to_string(&self).unwrap());
+        slice.as_bytes().to_vec()
+    }
+}
+
+impl Transport for Payload {
+    fn from_slice(slice: Vec<u8>) -> Self {
         let payload: Payload = serde_json::from_slice(&slice).unwrap();
         payload
     }
+}
 
-    pub fn format_bytes(&self) -> Vec<u8> {
-        let payload_slice = format!("{}\n", serde_json::to_string(&self).unwrap());
-        payload_slice.as_bytes().to_vec()
+impl Transport for CmdResponse {
+    fn from_slice(slice: Vec<u8>) -> Self {
+        let response: CmdResponse = serde_json::from_slice(&slice).unwrap();
+        response
     }
 }

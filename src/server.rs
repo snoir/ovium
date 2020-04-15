@@ -166,11 +166,15 @@ impl Server<'_> {
                 });
                 threads.push(node_thread);
             }
-            let mut results: Vec<CmdReturn> = Vec::new();
+            let mut cmd_response: CmdResponse = CmdResponse {
+                results: Vec::new(),
+            };
             for _ in 0..threads.len().clone() {
-                results.push(rx.recv().unwrap());
+                cmd_response.results.push(rx.recv().unwrap());
             }
-            dbg!(&results);
+            dbg!(&cmd_response);
+            let mut writer = BufWriter::new(stream);
+            writer.write(&cmd_response.format_bytes()).unwrap();
         })
         .unwrap();
     }
