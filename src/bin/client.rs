@@ -34,8 +34,8 @@ fn main() -> io::Result<()> {
     if matches.opt_present("p") {
         let client = Client {
             socket: socket_path,
-            payload: Payload::Ping {
-                content: "Hello from Ovium client!".to_string(),
+            request: Request::Ping {
+                content: "Ping from Ovium client!".to_string(),
             },
         };
         client.run()?;
@@ -47,7 +47,7 @@ fn main() -> io::Result<()> {
             let nodes: Vec<String> = n.split(',').map(String::from).collect();
             let client = Client {
                 socket: socket_path,
-                payload: Payload::Cmd {
+                request: Request::Cmd {
                     nodes: nodes,
                     content: c,
                 },

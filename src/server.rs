@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::types::*;
 use crossbeam_utils::thread;
-use log::{info, warn};
+use log::info;
 use serde::Deserialize;
 use ssh2::Session;
 use std::collections::HashMap;
@@ -59,14 +59,7 @@ impl Server<'_> {
 
     fn handle_client(&self, stream: UnixStream) -> io::Result<()> {
         let mut reader = BufReader::new(&stream);
-        let mut writer = BufWriter::new(&stream);
-
-        let hello_payload = Payload::Hello {
-            content: "Hello from Ovium server!".to_string(),
-        };
-
-        writer.write_all(&hello_payload.format_bytes())?;
-        writer.flush()?;
+        let _writer = BufWriter::new(&stream);
 
         loop {
             let mut resp = Vec::new();
@@ -77,14 +70,13 @@ impl Server<'_> {
                         info!("connection closed by remote");
                         break;
                     } else {
-                        let recv_payload = Payload::from_slice(resp);
-                        match recv_payload {
-                            Payload::Cmd { nodes, content } => {
+                        let recv_request = Request::from_slice(resp);
+                        match recv_request {
+                            Request::Cmd { nodes, content } => {
                                 self.handle_cmd(&stream, nodes, content)
                             }
-                            Payload::Hello { .. } => info!("Hello"),
-                            Payload::Ping { .. } => self.handle_ping(&stream),
-                            _ => warn!("Unhandled type!"),
+                            Request::Ping { .. } => self.handle_ping(&stream),
+                            //_ => warn!("Unhandled type!"),
                         }
                         break;
                     };
@@ -101,10 +93,10 @@ impl Server<'_> {
     fn handle_ping(&self, stream: &UnixStream) {
         let mut writer = BufWriter::new(stream);
         info!("Ping received, replying pong!");
-        let hello_payload = Payload::Hello {
+        let ping_response = Request::Ping {
             content: "Pong from server!".to_string(),
         };
-        writer.write_all(&hello_payload.format_bytes()).unwrap();
+        writer.write_all(&ping_response.format_bytes()).unwrap();
     }
 
     fn execute_cmd(node: &Node, cmd: String) -> Result<SshSuccess, Error> {
@@ -147,11 +139,16 @@ impl Server<'_> {
         let (tx, rx) = channel();
         thread::scope(move |s| {
             let mut threads = Vec::new();
+            info!(
+                "Received command '{}' for nodes: [{}]",
+                cmd,
+                nodes.join(", ")
+            );
             for node_name in nodes {
                 let node_tx = tx.clone();
                 let node_cmd = cmd.clone();
                 let node_thread = s.spawn(move |_| {
-                    //TODO: work here! u known the node name!
+                    info!("Launching '{}' on node: {}", node_cmd, node_name);
                     let exec_return =
                         self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
                     let ssh_return = match exec_return {
@@ -172,7 +169,7 @@ impl Server<'_> {
             for _ in 0..threads.len().clone() {
                 cmd_response.results.push(rx.recv().unwrap());
             }
-            dbg!(&cmd_response);
+
             let mut writer = BufWriter::new(stream);
             writer.write(&cmd_response.format_bytes()).unwrap();
         })

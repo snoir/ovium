@@ -1,11 +1,10 @@
 use crate::types::*;
-use log::info;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
 
 pub struct Client {
     pub socket: String,
-    pub payload: Payload,
+    pub request: Request,
 }
 
 impl Client {
@@ -15,13 +14,23 @@ impl Client {
         let mut writer = BufWriter::new(&stream);
 
         let mut resp = Vec::new();
+        writer.write_all(&self.request.format_bytes())?;
+        writer.flush().unwrap();
         reader.read_until(b'\n', &mut resp)?;
-        info!(
-            "server thread sent : {}",
-            String::from_utf8(resp).unwrap().trim()
-        );
 
-        writer.write_all(&self.payload.format_bytes())?;
+        match &self.request {
+            Request::Cmd { .. } => self.handle_cmd(resp),
+            _ => println!("nada"),
+        }
+
         Ok(())
+    }
+
+    fn handle_cmd(&self, resp: Vec<u8>) {
+        let cmd_response = CmdResponse::from_slice(resp);
+
+        for result in cmd_response.results.iter() {
+            println!("{}", result);
+        }
     }
 }
