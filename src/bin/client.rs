@@ -1,11 +1,16 @@
 use getopts::Options;
 use ovium::client::Client;
+use ovium::error::Error;
 use ovium::types::*;
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
-use std::{env, io, process};
+use std::{env, process};
 
-fn main() -> io::Result<()> {
-    TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap();
+fn main() -> Result<(), Error> {
+    match TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed) {
+        Ok(_) => (),
+        Err(err) => eprintln!("Failed while setting up logger: {}", err),
+    }
+
     let args: Vec<_> = env::args().collect();
     let program_name = args[0].clone();
     let mut opts = Options::new();
@@ -47,10 +52,7 @@ fn main() -> io::Result<()> {
             let nodes: Vec<String> = n.split(',').map(String::from).collect();
             let client = Client {
                 socket: socket_path,
-                request: Request::Cmd {
-                    nodes: nodes,
-                    content: c,
-                },
+                request: Request::Cmd { nodes, content: c },
             };
             client.run()?;
         } else {

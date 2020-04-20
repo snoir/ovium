@@ -1,7 +1,7 @@
-use crate::error::Error;
+use crate::error::{Error, ErrorKind, OviumError};
 use crate::types::*;
 use crossbeam_utils::thread;
-use log::info;
+use log::{error, info, warn};
 use serde::Deserialize;
 use ssh2::Session;
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{self, channel};
 
 pub struct Server<'a> {
     socket_path: &'a str,
@@ -24,25 +24,28 @@ pub struct ServerConfig {
 }
 
 impl Server<'_> {
-    pub fn new(socket_path: &str) -> Result<Server, io::Error> {
+    pub fn new(socket_path: &str) -> Result<Server, OviumError> {
         let config_path = Path::new("/home/samir/git/ovium-config");
         let server_config = ServerConfig::new(config_path)?;
         Ok(Server {
-            socket_path: socket_path,
+            socket_path,
             config: server_config,
         })
     }
 
-    pub fn run(&self) -> io::Result<()> {
-        let listener = UnixListener::bind(&self.socket_path)?;
+    pub fn run(&self) -> Result<(), OviumError> {
+        let listener =
+            UnixListener::bind(&self.socket_path).map_err(|err| (ErrorKind::Bind, err.into()))?;
 
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
                     /* connection succeeded */
                     thread::scope(move |s| {
-                        s.spawn(move |_| {
-                            self.handle_client(stream).unwrap();
+                        s.spawn::<_, Result<(), OviumError>>(move |_| {
+                            self.handle_client(stream)
+                                .map_err(|err| (ErrorKind::Handle, err))?;
+                            Ok(())
                         });
                     })
                     .unwrap();
@@ -57,7 +60,7 @@ impl Server<'_> {
         Ok(())
     }
 
-    fn handle_client(&self, stream: UnixStream) -> io::Result<()> {
+    fn handle_client(&self, stream: UnixStream) -> Result<(), Error> {
         let mut reader = BufReader::new(&stream);
         let _writer = BufWriter::new(&stream);
 
@@ -70,12 +73,12 @@ impl Server<'_> {
                         info!("connection closed by remote");
                         break;
                     } else {
-                        let recv_request = Request::from_slice(resp);
+                        let recv_request = Request::from_slice(resp)?;
                         match recv_request {
                             Request::Cmd { nodes, content } => {
-                                self.handle_cmd(&stream, nodes, content)
+                                self.handle_cmd(&stream, nodes, content)?
                             }
-                            Request::Ping { .. } => self.handle_ping(&stream),
+                            Request::Ping { .. } => self.handle_ping(&stream)?,
                             //_ => warn!("Unhandled type!"),
                         }
                         break;
@@ -90,13 +93,14 @@ impl Server<'_> {
         Ok(())
     }
 
-    fn handle_ping(&self, stream: &UnixStream) {
+    fn handle_ping(&self, stream: &UnixStream) -> Result<(), Error> {
         let mut writer = BufWriter::new(stream);
         info!("Ping received, replying pong!");
         let ping_response = Request::Ping {
             content: "Pong from server!".to_string(),
         };
-        writer.write_all(&ping_response.format_bytes()).unwrap();
+        writer.write_all(&ping_response.format_bytes()?)?;
+        Ok(())
     }
 
     fn execute_cmd(node: &Node, cmd: String) -> Result<SshSuccess, Error> {
@@ -135,8 +139,14 @@ impl Server<'_> {
         })
     }
 
-    fn handle_cmd(&self, stream: &UnixStream, nodes: Vec<String>, cmd: String) {
+    fn handle_cmd(
+        &self,
+        stream: &UnixStream,
+        nodes: Vec<String>,
+        cmd: String,
+    ) -> Result<(), Error> {
         let (tx, rx) = channel();
+        let nodes_nb = nodes.len();
         thread::scope(move |s| {
             let mut threads = Vec::new();
             info!(
@@ -147,44 +157,67 @@ impl Server<'_> {
             for node_name in nodes {
                 let node_tx = tx.clone();
                 let node_cmd = cmd.clone();
-                let node_thread = s.spawn(move |_| {
+                let node_thread = s.spawn(move |_| -> Result<(), mpsc::SendError<_>> {
                     info!("Launching '{}' on node: {}", node_cmd, node_name);
                     let exec_return =
                         self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
                     let ssh_return = match exec_return {
                         Ok(ssh_return) => SshReturn::SshSuccess(ssh_return),
-                        Err(err) => SshReturn::SshFailure(err),
+                        Err(err) => SshReturn::SshFailure(err.to_string()),
                     };
                     let cmd_return = CmdReturn {
-                        node_name: node_name,
+                        node_name,
                         data: ssh_return,
                     };
-                    node_tx.send(cmd_return).unwrap();
+                    node_tx.send(cmd_return)?;
+                    Ok(())
                 });
                 threads.push(node_thread);
             }
-            let mut cmd_response: CmdResponse = CmdResponse {
-                results: Vec::new(),
-            };
-            for _ in 0..threads.len().clone() {
-                cmd_response.results.push(rx.recv().unwrap());
-            }
 
-            let mut writer = BufWriter::new(stream);
-            writer.write(&cmd_response.format_bytes()).unwrap();
+            // If node_tx.send should failed
+            for th in threads {
+                if let Err(err) = th.join().unwrap() {
+                    warn!("A command execution thread failed with error: {}", err);
+                }
+            }
         })
         .unwrap();
+
+        let mut cmd_response: CmdResponse = CmdResponse {
+            results: Vec::new(),
+        };
+        for _ in 0..nodes_nb {
+            if let Ok(recv) = rx.recv() {
+                cmd_response.results.push(recv);
+            }
+        }
+        let mut writer = BufWriter::new(stream);
+        writer.write_all(&cmd_response.format_bytes()?)?;
+        Ok(())
     }
 }
 
 impl ServerConfig {
-    pub fn new(config_dir: &Path) -> Result<ServerConfig, io::Error> {
-        let mut config_string = String::new();
+    pub fn new(config_dir: &Path) -> Result<ServerConfig, OviumError> {
         let node_path = config_dir.join("nodes.toml");
+        let nodes_config_string = match read_file(&node_path) {
+            Ok(config_string) => config_string,
+            Err(err) => {
+                error!("Unable to load file {:?}: {}", &node_path, err);
+                return Err(OviumError::from((ErrorKind::LoadConfig, err.into())));
+            }
+        };
 
-        let mut f = File::open(node_path)?;
-        f.read_to_string(&mut config_string)?;
-        let nodes: ServerConfig = toml::from_str(&config_string)?;
+        let nodes: ServerConfig = toml::from_str(&nodes_config_string)
+            .map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
         Ok(nodes)
     }
+}
+
+fn read_file(file: &Path) -> Result<String, Error> {
+    let mut f = File::open(file)?;
+    let mut file_string = String::new();
+    f.read_to_string(&mut file_string)?;
+    Ok(file_string)
 }

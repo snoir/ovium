@@ -1,10 +1,11 @@
 use crate::error::Error;
 use serde::{Deserialize, Serialize};
+//use serde_json::Result;
 use std::fmt::{self, Display};
 
-const RED: &'static str = "\x1b[0;31m";
-const GREEN: &'static str = "\x1b[0;32m";
-const NC: &'static str = "\x1b[0m";
+const RED: &str = "\x1b[0;31m";
+const GREEN: &str = "\x1b[0;32m";
+const NC: &str = "\x1b[0m";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdReturn {
@@ -15,7 +16,7 @@ pub struct CmdReturn {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SshReturn {
     SshSuccess(SshSuccess),
-    SshFailure(Error),
+    SshFailure(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -49,25 +50,33 @@ fn default_user() -> String {
 }
 
 pub trait Transport: serde::Serialize {
-    fn from_slice(slice: Vec<u8>) -> Self;
+    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
+    where
+        Self: Sized;
 
-    fn format_bytes(&self) -> Vec<u8> {
-        let slice = format!("{}\n", serde_json::to_string(&self).unwrap());
-        slice.as_bytes().to_vec()
+    fn format_bytes(&self) -> Result<Vec<u8>, Error> {
+        let slice = format!("{}\n", serde_json::to_string(&self)?);
+        Ok(slice.as_bytes().to_vec())
     }
 }
 
 impl Transport for Request {
-    fn from_slice(slice: Vec<u8>) -> Self {
-        let request: Request = serde_json::from_slice(&slice).unwrap();
-        request
+    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let request: Request = serde_json::from_slice(&slice)?;
+        Ok(request)
     }
 }
 
 impl Transport for CmdResponse {
-    fn from_slice(slice: Vec<u8>) -> Self {
-        let response: CmdResponse = serde_json::from_slice(&slice).unwrap();
-        response
+    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let response: CmdResponse = serde_json::from_slice(&slice)?;
+        Ok(response)
     }
 }
 
@@ -86,21 +95,21 @@ impl Display for CmdReturn {
                 if let Some(stdout) = &success.stdout {
                     write!(f, "\n  stdout:\n")?;
                     for line in stdout.trim().lines() {
-                        write!(f, "    {}\n", line)?;
+                        writeln!(f, "    {}", line)?;
                     }
                 }
                 if let Some(stderr) = &success.stderr {
                     write!(f, "\n  stderr:\n")?;
                     for line in stderr.trim().lines() {
-                        write!(f, "    {}\n", line)?;
+                        writeln!(f, "    {}", line)?;
                     }
                 }
                 write!(f, "{}", NC)
             }
             SshReturn::SshFailure(failure) => {
                 write!(f, "{}", RED)?;
-                write!(f, "{} | TRANSPORT FAILURE:\n", self.node_name)?;
-                write!(f, "  {}\n", failure)?;
+                writeln!(f, "{} | TRANSPORT FAILURE:", self.node_name)?;
+                writeln!(f, "  {}", failure)?;
                 write!(f, "{}", NC)
             }
         }
