@@ -17,7 +17,6 @@ fn main() -> Result<(), Error> {
     opts.optopt("s", "", "server socket path", "sock");
     opts.optopt("c", "", "remote command to launch", "command");
     opts.optopt("n", "", "nodes to manage", "nodes");
-    opts.optflag("p", "", "send ping to ovium server");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -35,17 +34,6 @@ fn main() -> Result<(), Error> {
         println!("socket path is required!");
         process::exit(1);
     };
-
-    if matches.opt_present("p") {
-        let client = Client {
-            socket: socket_path,
-            request: Request::Ping {
-                content: "Ping from Ovium client!".to_string(),
-            },
-        };
-        client.run()?;
-        process::exit(0);
-    }
 
     if let Some(c) = matches.opt_str("c") {
         if let Some(n) = matches.opt_str("n") {

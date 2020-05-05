@@ -15,23 +15,24 @@ impl Client {
         let mut writer = BufWriter::new(&stream);
 
         let mut resp = Vec::new();
-        writer.write_all(&self.request.format_bytes().unwrap())?;
+        writer.write_all(&self.request.format_bytes()?)?;
         writer.flush()?;
         reader.read_until(b'\n', &mut resp)?;
 
         match &self.request {
-            Request::Cmd { .. } => self.handle_cmd(resp),
-            _ => println!("nada"),
+            Request::Cmd { .. } => self.handle_cmd(resp)?,
         }
 
         Ok(())
     }
 
-    fn handle_cmd(&self, resp: Vec<u8>) {
-        let cmd_response = CmdResponse::from_slice(resp).unwrap();
+    fn handle_cmd(&self, resp: Vec<u8>) -> Result<(), Error> {
+        let cmd_response = CmdResponse::from_slice(resp)?;
 
         for result in cmd_response.results.iter() {
             println!("{}", result);
         }
+
+        Ok(())
     }
 }

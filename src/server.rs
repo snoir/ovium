@@ -78,8 +78,6 @@ impl Server<'_> {
                             Request::Cmd { nodes, content } => {
                                 self.handle_cmd(&stream, nodes, content)?
                             }
-                            Request::Ping { .. } => self.handle_ping(&stream)?,
-                            //_ => warn!("Unhandled type!"),
                         }
                         break;
                     };
@@ -90,16 +88,6 @@ impl Server<'_> {
                 },
             }
         }
-        Ok(())
-    }
-
-    fn handle_ping(&self, stream: &UnixStream) -> Result<(), Error> {
-        let mut writer = BufWriter::new(stream);
-        info!("Ping received, replying pong!");
-        let ping_response = Request::Ping {
-            content: "Pong from server!".to_string(),
-        };
-        writer.write_all(&ping_response.format_bytes()?)?;
         Ok(())
     }
 

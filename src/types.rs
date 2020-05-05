@@ -1,6 +1,5 @@
 use crate::error::Error;
 use serde::{Deserialize, Serialize};
-//use serde_json::Result;
 use std::fmt::{self, Display};
 
 const RED: &str = "\x1b[0;31m";
@@ -34,7 +33,6 @@ pub struct CmdResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
     Cmd { nodes: Vec<String>, content: String },
-    Ping { content: String },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
