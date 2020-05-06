@@ -1,8 +1,10 @@
 use crate::error::{Error, ErrorKind, OviumError};
 use crate::types::*;
+use crossbeam_channel::unbounded;
 use crossbeam_utils::thread;
 use log::{error, info, warn};
 use serde::Deserialize;
+use signal_hook::{iterator::Signals, SIGINT};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::fs::File;
@@ -12,10 +14,12 @@ use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::sync::mpsc::{self, channel};
+use std::time::Duration;
 
 pub struct Server<'a> {
     socket_path: &'a str,
     config: ServerConfig,
+    listener: UnixListener,
 }
 
 #[derive(Deserialize, Debug)]
@@ -27,40 +31,72 @@ impl Server<'_> {
     pub fn new(socket_path: &str) -> Result<Server, OviumError> {
         let config_path = Path::new("/home/samir/git/ovium-config");
         let server_config = ServerConfig::new(config_path)?;
+        let listener =
+            UnixListener::bind(socket_path).map_err(|err| (ErrorKind::Bind, err.into()))?;
+        listener
+            .set_nonblocking(true)
+            .map_err(|err| (ErrorKind::Bind, err.into()))?;
+
         Ok(Server {
             socket_path,
             config: server_config,
+            listener,
         })
     }
 
     pub fn run(&self) -> Result<(), OviumError> {
-        let listener =
-            UnixListener::bind(&self.socket_path).map_err(|err| (ErrorKind::Bind, err.into()))?;
+        thread::scope(move |s| -> Result<(), OviumError> {
+            let (signal_sender, signal_receiver) = unbounded();
+            let signals = Signals::new(&[SIGINT]).unwrap();
 
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    /* connection succeeded */
-                    thread::scope(move |s| {
+            s.spawn(move |_| {
+                for sig in signals.forever() {
+                    println!("Received signal {:?}", sig);
+                    if sig == signal_hook::SIGINT {
+                        signal_sender.clone().send(sig).unwrap();
+                        break;
+                    }
+                }
+            });
+
+            for stream in self.listener.incoming() {
+                if let Ok(_) = signal_receiver.clone().try_recv() {
+                    break;
+                }
+                match stream {
+                    Ok(stream) => {
+                        /* connection succeeded */
+                        let stream_receiver = signal_receiver.clone();
                         s.spawn::<_, Result<(), OviumError>>(move |_| {
-                            self.handle_client(stream)
+                            self.handle_client(stream, stream_receiver)
                                 .map_err(|err| (ErrorKind::Handle, err))?;
                             Ok(())
                         });
-                    })
-                    .unwrap();
-                }
-                Err(_err) => {
-                    /* connection failed */
-                    break;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(500));
+                        continue;
+                    }
+
+                    Err(_err) => {
+                        /* connection failed */
+                        break;
+                    }
                 }
             }
-        }
+            Ok(())
+        })
+        .unwrap()
+        .unwrap();
 
         Ok(())
     }
 
-    fn handle_client(&self, stream: UnixStream) -> Result<(), Error> {
+    fn handle_client(
+        &self,
+        stream: UnixStream,
+        _signal_receiver: crossbeam_channel::Receiver<i32>,
+    ) -> Result<(), Error> {
         let mut reader = BufReader::new(&stream);
         let _writer = BufWriter::new(&stream);
 
@@ -183,6 +219,12 @@ impl Server<'_> {
         let mut writer = BufWriter::new(stream);
         writer.write_all(&cmd_response.format_bytes()?)?;
         Ok(())
+    }
+}
+
+impl Drop for Server<'_> {
+    fn drop(&mut self) {
+        std::fs::remove_file(&self.socket_path).unwrap();
     }
 }
 
