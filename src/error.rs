@@ -46,7 +46,12 @@ impl fmt::Display for OviumError {
             ErrorKind::Bind => writeln!(f, "Error while binding socket"),
         }?;
 
-        write!(f, "  Caused by: {}", &self.source)
+        if let Some(detail) = &self.detail {
+            write!(f, "  Caused by: {}", &self.source)?;
+            write!(f, "  Detail: {}", detail)
+        } else {
+            write!(f, "  Caused by: {}", &self.source)
+        }
     }
 }
 
