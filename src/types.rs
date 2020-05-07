@@ -38,13 +38,18 @@ pub enum Request {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Node {
     pub ip: String,
-    pub port: i32,
+    #[serde(default = "default_port")]
+    pub port: u32,
     #[serde(default = "default_user")]
     pub user: String,
 }
 
 fn default_user() -> String {
     "root".to_string()
+}
+
+fn default_port() -> u32 {
+    22
 }
 
 pub trait Transport: serde::Serialize {
