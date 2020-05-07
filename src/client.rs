@@ -3,14 +3,14 @@ use crate::types::*;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
 
-pub struct Client {
-    pub socket: String,
+pub struct Client<'a> {
+    pub socket_path: &'a str,
     pub request: Request,
 }
 
-impl Client {
+impl Client<'_> {
     pub fn run(&self) -> Result<(), Error> {
-        let stream = UnixStream::connect(&self.socket)?;
+        let stream = UnixStream::connect(&self.socket_path)?;
         let mut reader = BufReader::new(&stream);
         let mut writer = BufWriter::new(&stream);
 
@@ -28,7 +28,6 @@ impl Client {
 
     fn handle_cmd(&self, resp: Vec<u8>) -> Result<(), Error> {
         let cmd_response = CmdResponse::from_slice(resp)?;
-
         for result in cmd_response.results.iter() {
             println!("{}", result);
         }

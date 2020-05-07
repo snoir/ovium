@@ -45,7 +45,7 @@ impl Server<'_> {
     }
 
     pub fn run(&self) -> Result<(), OviumError> {
-        thread::scope(move |s| -> Result<(), OviumError> {
+        thread::scope(|s| -> Result<(), OviumError> {
             let (signal_sender, signal_receiver) = unbounded();
             let signals = Signals::new(&[SIGINT]).unwrap();
 
@@ -63,6 +63,7 @@ impl Server<'_> {
                 if let Ok(_) = signal_receiver.clone().try_recv() {
                     break;
                 }
+
                 match stream {
                     Ok(stream) => {
                         /* connection succeeded */
@@ -78,7 +79,7 @@ impl Server<'_> {
                         continue;
                     }
 
-                    Err(_err) => {
+                    Err(_) => {
                         /* connection failed */
                         break;
                     }
@@ -86,8 +87,7 @@ impl Server<'_> {
             }
             Ok(())
         })
-        .unwrap()
-        .unwrap();
+        .unwrap()?;
 
         Ok(())
     }
@@ -98,7 +98,6 @@ impl Server<'_> {
         _signal_receiver: crossbeam_channel::Receiver<i32>,
     ) -> Result<(), Error> {
         let mut reader = BufReader::new(&stream);
-        let _writer = BufWriter::new(&stream);
 
         loop {
             let mut resp = Vec::new();
@@ -124,6 +123,69 @@ impl Server<'_> {
                 },
             }
         }
+        Ok(())
+    }
+
+    fn handle_cmd(
+        &self,
+        stream: &UnixStream,
+        nodes: Vec<String>,
+        cmd: String,
+    ) -> Result<(), Error> {
+        let (tx, rx) = channel();
+        let nodes_nb = nodes.len();
+        info!(
+            "Received command '{}' for nodes: [{}]",
+            cmd,
+            nodes.join(", ")
+        );
+
+        thread::scope(move |s| {
+            let mut threads = Vec::new();
+
+            for node_name in nodes {
+                let node_tx = tx.clone();
+                let node_cmd = cmd.clone();
+                let node_thread = s.spawn(move |_| -> Result<(), mpsc::SendError<_>> {
+                    info!("Launching '{}' on node: {}", node_cmd, node_name);
+                    let exec_return =
+                        self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
+                    let ssh_return = match exec_return {
+                        Ok(ssh_return) => SshReturn::SshSuccess(ssh_return),
+                        Err(err) => SshReturn::SshFailure(err.to_string()),
+                    };
+                    let cmd_return = CmdReturn {
+                        node_name,
+                        data: ssh_return,
+                    };
+                    node_tx.send(cmd_return)?;
+                    Ok(())
+                });
+
+                threads.push(node_thread);
+            }
+
+            // If node_tx.send should failed
+            for th in threads {
+                if let Err(err) = th.join().unwrap() {
+                    warn!("A command execution thread failed with error: {}", err);
+                }
+            }
+        })
+        .unwrap();
+
+        let mut cmd_response: CmdResponse = CmdResponse {
+            results: Vec::new(),
+        };
+        for _ in 0..nodes_nb {
+            if let Ok(recv) = rx.recv() {
+                cmd_response.results.push(recv);
+            }
+        }
+
+        let mut writer = BufWriter::new(stream);
+        writer.write_all(&cmd_response.format_bytes()?)?;
+
         Ok(())
     }
 
@@ -162,64 +224,6 @@ impl Server<'_> {
             exit_status,
         })
     }
-
-    fn handle_cmd(
-        &self,
-        stream: &UnixStream,
-        nodes: Vec<String>,
-        cmd: String,
-    ) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        let nodes_nb = nodes.len();
-        thread::scope(move |s| {
-            let mut threads = Vec::new();
-            info!(
-                "Received command '{}' for nodes: [{}]",
-                cmd,
-                nodes.join(", ")
-            );
-            for node_name in nodes {
-                let node_tx = tx.clone();
-                let node_cmd = cmd.clone();
-                let node_thread = s.spawn(move |_| -> Result<(), mpsc::SendError<_>> {
-                    info!("Launching '{}' on node: {}", node_cmd, node_name);
-                    let exec_return =
-                        self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
-                    let ssh_return = match exec_return {
-                        Ok(ssh_return) => SshReturn::SshSuccess(ssh_return),
-                        Err(err) => SshReturn::SshFailure(err.to_string()),
-                    };
-                    let cmd_return = CmdReturn {
-                        node_name,
-                        data: ssh_return,
-                    };
-                    node_tx.send(cmd_return)?;
-                    Ok(())
-                });
-                threads.push(node_thread);
-            }
-
-            // If node_tx.send should failed
-            for th in threads {
-                if let Err(err) = th.join().unwrap() {
-                    warn!("A command execution thread failed with error: {}", err);
-                }
-            }
-        })
-        .unwrap();
-
-        let mut cmd_response: CmdResponse = CmdResponse {
-            results: Vec::new(),
-        };
-        for _ in 0..nodes_nb {
-            if let Ok(recv) = rx.recv() {
-                cmd_response.results.push(recv);
-            }
-        }
-        let mut writer = BufWriter::new(stream);
-        writer.write_all(&cmd_response.format_bytes()?)?;
-        Ok(())
-    }
 }
 
 impl Drop for Server<'_> {
@@ -230,11 +234,11 @@ impl Drop for Server<'_> {
 
 impl ServerConfig {
     pub fn new(config_dir: &Path) -> Result<ServerConfig, OviumError> {
-        let node_path = config_dir.join("nodes.toml");
-        let nodes_config_string = match read_file(&node_path) {
+        let nodes_file_path = config_dir.join("nodes.toml");
+        let nodes_config_string = match read_file(&nodes_file_path) {
             Ok(config_string) => config_string,
             Err(err) => {
-                error!("Unable to load file {:?}: {}", &node_path, err);
+                error!("Unable to load file {:?}: {}", &nodes_file_path, err);
                 return Err(OviumError::from((ErrorKind::LoadConfig, err.into())));
             }
         };
@@ -249,5 +253,6 @@ fn read_file(file: &Path) -> Result<String, Error> {
     let mut f = File::open(file)?;
     let mut file_string = String::new();
     f.read_to_string(&mut file_string)?;
+
     Ok(file_string)
 }

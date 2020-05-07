@@ -28,23 +28,24 @@ fn main() -> Result<(), Error> {
         process::exit(0);
     }
 
-    let socket_path = if let Some(s) = matches.opt_str("s") {
-        s
-    } else {
-        println!("socket path is required!");
-        process::exit(1);
+    let socket_path = match matches.opt_str("s") {
+        Some(s) => s,
+        None => {
+            eprintln!("socket path is required!");
+            process::exit(1);
+        }
     };
 
     if let Some(c) = matches.opt_str("c") {
         if let Some(n) = matches.opt_str("n") {
             let nodes: Vec<String> = n.split(',').map(String::from).collect();
             let client = Client {
-                socket: socket_path,
+                socket_path: &socket_path,
                 request: Request::Cmd { nodes, content: c },
             };
             client.run()?;
         } else {
-            println!("nodes list is required!");
+            eprintln!("nodes list is required!");
             process::exit(1);
         }
     }

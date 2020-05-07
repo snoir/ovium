@@ -58,16 +58,6 @@ pub trait Transport: serde::Serialize {
     }
 }
 
-impl Transport for Request {
-    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        let request: Request = serde_json::from_slice(&slice)?;
-        Ok(request)
-    }
-}
-
 impl Transport for CmdResponse {
     fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
     where
@@ -75,6 +65,16 @@ impl Transport for CmdResponse {
     {
         let response: CmdResponse = serde_json::from_slice(&slice)?;
         Ok(response)
+    }
+}
+
+impl Transport for Request {
+    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let request: Request = serde_json::from_slice(&slice)?;
+        Ok(request)
     }
 }
 
