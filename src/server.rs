@@ -25,6 +25,7 @@ pub struct Server<'a> {
 #[derive(Deserialize, Debug)]
 pub struct ServerConfig {
     nodes: HashMap<String, Node>,
+    groups: Option<HashMap<String, Vec<String>>>,
 }
 
 impl Server<'_> {
@@ -245,8 +246,24 @@ impl ServerConfig {
 
         let nodes: ServerConfig = toml::from_str(&nodes_config_string)
             .map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
+        validate_config(&nodes);
+
         Ok(nodes)
     }
+}
+
+fn validate_config(config: &ServerConfig) -> Result<(), Error> {
+    if let Some(groups) = &config.groups {
+        for node_group in groups {
+            for node in node_group.1 {
+                if config.nodes.contains_key(node) {
+                    return Err(Error::ConfigParse);
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn read_file(file: &Path) -> Result<String, Error> {

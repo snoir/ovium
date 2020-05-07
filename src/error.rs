@@ -7,12 +7,14 @@ pub enum Error {
     Io(io::Error),
     Json(serde_json::Error),
     TomlDe(toml::de::Error),
+    ConfigParse,
 }
 
 #[derive(Debug)]
 pub struct OviumError {
     kind: ErrorKind,
     source: Error,
+    detail: Option<String>,
 }
 
 #[derive(Debug)]
@@ -30,6 +32,7 @@ impl fmt::Display for Error {
             Error::Ssh(err) => write!(f, "Ssh error: {}", err),
             Error::Json(err) => write!(f, "Json error: {}", err),
             Error::TomlDe(err) => write!(f, "Toml deserialization error: {}", err),
+            Error::ConfigParse => write!(f, "Configuration parsing error"),
         }
     }
 }
@@ -81,6 +84,20 @@ impl From<toml::de::Error> for Error {
 
 impl From<(ErrorKind, Error)> for OviumError {
     fn from((kind, source): (ErrorKind, Error)) -> Self {
-        OviumError { kind, source }
+        OviumError {
+            kind,
+            source,
+            detail: None,
+        }
+    }
+}
+
+impl From<(ErrorKind, Error, String)> for OviumError {
+    fn from((kind, source, detail): (ErrorKind, Error, String)) -> Self {
+        OviumError {
+            kind,
+            source,
+            detail: Some(detail),
+        }
     }
 }
