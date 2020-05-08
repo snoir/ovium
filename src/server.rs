@@ -1,4 +1,4 @@
-use crate::error::{Error, ErrorKind, OviumError};
+use crate::error::{ConfigError, Error, ErrorKind, OviumError};
 use crate::types::*;
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread;
@@ -245,22 +245,27 @@ impl ServerConfig {
         };
 
         let nodes: ServerConfig = toml::from_str(&nodes_config_string)
-            .map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
-        validate_config(&nodes);
+            .map_err(|err| (ErrorKind::InvalidConfig, ConfigError::Parse(err).into()))?;
+        validate_config(&nodes).map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
 
         Ok(nodes)
     }
 }
 
-fn validate_config(config: &ServerConfig) -> Result<(), Error> {
+fn validate_config(config: &ServerConfig) -> Result<(), ConfigError> {
+    let mut unknown_nodes: Vec<String> = Vec::new();
     if let Some(groups) = &config.groups {
         for node_group in groups {
             for node in node_group.1 {
-                if config.nodes.contains_key(node) {
-                    return Err(Error::ConfigParse);
+                if !config.nodes.contains_key(node) {
+                    unknown_nodes.push(node.to_string());
                 }
             }
         }
+    }
+
+    if unknown_nodes.len() > 0 {
+        return Err(ConfigError::UnknownNodes(unknown_nodes));
     }
 
     Ok(())

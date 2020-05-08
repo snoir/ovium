@@ -6,8 +6,7 @@ pub enum Error {
     Ssh(ssh2::Error),
     Io(io::Error),
     Json(serde_json::Error),
-    TomlDe(toml::de::Error),
-    ConfigParse,
+    ConfigError(ConfigError),
 }
 
 #[derive(Debug)]
@@ -15,6 +14,12 @@ pub struct OviumError {
     kind: ErrorKind,
     source: Error,
     detail: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum ConfigError {
+    UnknownNodes(Vec<String>),
+    Parse(toml::de::Error),
 }
 
 #[derive(Debug)]
@@ -31,8 +36,16 @@ impl fmt::Display for Error {
             Error::Io(err) => write!(f, "I/O error: {}", err),
             Error::Ssh(err) => write!(f, "Ssh error: {}", err),
             Error::Json(err) => write!(f, "Json error: {}", err),
-            Error::TomlDe(err) => write!(f, "Toml deserialization error: {}", err),
-            Error::ConfigParse => write!(f, "Configuration parsing error"),
+            Error::ConfigError(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConfigError::Parse(err) => write!(f, "Parsing error: {}", err),
+            ConfigError::UnknownNodes(err) => write!(f, "Unkown nodes: '{}'", err.join(", ")),
         }
     }
 }
@@ -81,9 +94,9 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<toml::de::Error> for Error {
-    fn from(error: toml::de::Error) -> Self {
-        Error::TomlDe(error)
+impl From<ConfigError> for Error {
+    fn from(error: ConfigError) -> Self {
+        Error::ConfigError(error)
     }
 }
 
