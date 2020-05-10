@@ -2,18 +2,17 @@ use crate::error::{ConfigError, Error, ErrorKind, OviumError};
 use crate::types::*;
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread;
-use log::{error, info, warn};
+use log::{error, info};
 use serde::Deserialize;
 use signal_hook::{iterator::Signals, SIGINT};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader};
 use std::net::TcpStream;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
-use std::sync::mpsc::{self, channel};
 use std::time::Duration;
 
 pub struct Server<'a> {
@@ -24,8 +23,8 @@ pub struct Server<'a> {
 
 #[derive(Deserialize, Debug)]
 pub struct ServerConfig {
-    nodes: HashMap<String, Node>,
-    groups: Option<HashMap<String, Vec<String>>>,
+    pub nodes: HashMap<String, Node>,
+    pub groups: Option<HashMap<String, Vec<String>>>,
 }
 
 impl Server<'_> {
@@ -111,8 +110,9 @@ impl Server<'_> {
                     } else {
                         let recv_request = Request::from_slice(&resp)?;
                         match recv_request {
-                            Request::Cmd { nodes, content } => {
-                                self.handle_cmd(&stream, nodes, content)?
+                            Request::Cmd(req) => {
+                                let cmd_handler = HandlerRequest::new(stream, req);
+                                cmd_handler.handle(&self.config)?;
                             }
                         }
                         break;
@@ -127,70 +127,7 @@ impl Server<'_> {
         Ok(())
     }
 
-    fn handle_cmd(
-        &self,
-        stream: &UnixStream,
-        nodes: Vec<String>,
-        cmd: String,
-    ) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        let nodes_nb = nodes.len();
-        info!(
-            "Received command '{}' for nodes: [{}]",
-            cmd,
-            nodes.join(", ")
-        );
-
-        thread::scope(move |s| {
-            let mut threads = Vec::new();
-
-            for node_name in nodes {
-                let node_tx = tx.clone();
-                let node_cmd = cmd.clone();
-                let node_thread = s.spawn(move |_| -> Result<(), mpsc::SendError<_>> {
-                    info!("Launching '{}' on node: {}", node_cmd, node_name);
-                    let exec_return =
-                        self::Server::execute_cmd(&self.config.nodes[&node_name], node_cmd);
-                    let ssh_return = match exec_return {
-                        Ok(ssh_return) => SshReturn::SshSuccess(ssh_return),
-                        Err(err) => SshReturn::SshFailure(err.to_string()),
-                    };
-                    let cmd_return = CmdReturn {
-                        node_name,
-                        data: ssh_return,
-                    };
-                    node_tx.send(cmd_return)?;
-                    Ok(())
-                });
-
-                threads.push(node_thread);
-            }
-
-            // If node_tx.send should failed
-            for th in threads {
-                if let Err(err) = th.join().unwrap() {
-                    warn!("A command execution thread failed with error: {}", err);
-                }
-            }
-        })
-        .unwrap();
-
-        let mut cmd_response: CmdResponse = CmdResponse {
-            results: Vec::new(),
-        };
-        for _ in 0..nodes_nb {
-            if let Ok(recv) = rx.recv() {
-                cmd_response.results.push(recv);
-            }
-        }
-
-        let mut writer = BufWriter::new(stream);
-        writer.write_all(&cmd_response.format_bytes()?)?;
-
-        Ok(())
-    }
-
-    fn execute_cmd(node: &Node, cmd: String) -> Result<SshSuccess, Error> {
+    pub fn execute_cmd(node: &Node, cmd: String) -> Result<SshSuccess, Error> {
         let node_addr = format!("{}:{}", node.ip, node.port);
         let tcp = TcpStream::connect(node_addr)?;
         let mut sess = Session::new()?;

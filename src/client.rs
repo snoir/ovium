@@ -27,9 +27,13 @@ impl Client<'_> {
     }
 
     fn handle_cmd(&self, resp: Vec<u8>) -> Result<(), Error> {
-        let cmd_response = CmdResponse::from_slice(&resp)?;
-        for result in cmd_response.results.iter() {
-            println!("{}", result);
+        let cmd_response = Response::from_slice(&resp)?;
+        match cmd_response {
+            Response::Cmd(results) => {
+                for result in results.iter() {
+                    println!("{}", result);
+                }
+            }
         }
 
         Ok(())

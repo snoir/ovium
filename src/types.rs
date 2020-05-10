@@ -1,6 +1,8 @@
 use crate::error::Error;
+use crate::server::ServerConfig;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
+use std::os::unix::net::UnixStream;
 
 const RED: &str = "\x1b[0;31m";
 const GREEN: &str = "\x1b[0;32m";
@@ -26,13 +28,19 @@ pub struct SshSuccess {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CmdResponse {
-    pub results: Vec<CmdReturn>,
+pub enum Response {
+    Cmd(Vec<CmdReturn>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
-    Cmd { nodes: Vec<String>, content: String },
+    Cmd(CmdRequest),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CmdRequest {
+    pub nodes: Vec<String>,
+    pub command: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -68,7 +76,23 @@ pub trait Message: serde::Serialize {
 }
 
 impl Message for Request {}
-impl Message for CmdResponse {}
+impl Message for Response {}
+
+#[derive(Debug)]
+pub struct HandlerRequest<T, U> {
+    pub stream: UnixStream,
+    pub req: T,
+    pub ret: Vec<U>,
+}
+
+pub trait Handle<T, U> {
+    fn new(stream: UnixStream, req: T) -> HandlerRequest<T, U> {
+        let ret: Vec<U> = Vec::new();
+        HandlerRequest { stream, req, ret }
+    }
+
+    fn handle(&self, server_config: &ServerConfig) -> Result<(), Error>;
+}
 
 impl Display for CmdReturn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
