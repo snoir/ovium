@@ -52,10 +52,14 @@ fn default_port() -> u32 {
     22
 }
 
-pub trait Transport: serde::Serialize {
-    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
+pub trait Message: serde::Serialize {
+    fn from_slice<'a>(slice: &'a Vec<u8>) -> Result<Self, Error>
     where
-        Self: Sized;
+        Self: Sized + Deserialize<'a>,
+    {
+        let response = serde_json::from_slice(&slice)?;
+        Ok(response)
+    }
 
     fn format_bytes(&self) -> Result<Vec<u8>, Error> {
         let slice = format!("{}\n", serde_json::to_string(&self)?);
@@ -63,25 +67,8 @@ pub trait Transport: serde::Serialize {
     }
 }
 
-impl Transport for CmdResponse {
-    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        let response: CmdResponse = serde_json::from_slice(&slice)?;
-        Ok(response)
-    }
-}
-
-impl Transport for Request {
-    fn from_slice(slice: Vec<u8>) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        let request: Request = serde_json::from_slice(&slice)?;
-        Ok(request)
-    }
-}
+impl Message for Request {}
+impl Message for CmdResponse {}
 
 impl Display for CmdReturn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

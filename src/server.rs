@@ -109,7 +109,7 @@ impl Server<'_> {
                         info!("connection closed by remote");
                         break;
                     } else {
-                        let recv_request = Request::from_slice(resp)?;
+                        let recv_request = Request::from_slice(&resp)?;
                         match recv_request {
                             Request::Cmd { nodes, content } => {
                                 self.handle_cmd(&stream, nodes, content)?
