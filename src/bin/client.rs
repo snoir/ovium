@@ -41,7 +41,7 @@ fn main() -> Result<(), Error> {
             let nodes: Vec<String> = n.split(',').map(String::from).collect();
             let client = Client {
                 socket_path: &socket_path,
-                request: Request::Cmd(CmdRequest { nodes, command: c }),
+                request: Request(CmdRequest { nodes, command: c }),
             };
             client.run()?;
         } else {

@@ -109,12 +109,8 @@ impl Server<'_> {
                         break;
                     } else {
                         let recv_request = Request::from_slice(&resp)?;
-                        match recv_request {
-                            Request::Cmd(req) => {
-                                let cmd_handler = HandlerRequest::new(stream, req);
-                                cmd_handler.handle(&self.config)?;
-                            }
-                        }
+                        let cmd_handler = ServerHandler::new(stream, recv_request);
+                        cmd_handler.handle(&self.config)?;
                         break;
                     };
                 }

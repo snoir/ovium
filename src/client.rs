@@ -5,7 +5,7 @@ use std::os::unix::net::UnixStream;
 
 pub struct Client<'a> {
     pub socket_path: &'a str,
-    pub request: Request,
+    pub request: Request<CmdRequest>,
 }
 
 impl Client<'_> {
@@ -19,9 +19,7 @@ impl Client<'_> {
         writer.flush()?;
         reader.read_until(b'\n', &mut resp)?;
 
-        match &self.request {
-            Request::Cmd { .. } => self.handle_cmd(resp)?,
-        }
+        self.handle_cmd(resp)?;
 
         Ok(())
     }

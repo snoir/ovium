@@ -33,9 +33,7 @@ pub enum Response {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Request {
-    Cmd(CmdRequest),
-}
+pub struct Request<T>(pub T);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdRequest {
@@ -60,7 +58,7 @@ fn default_port() -> u32 {
     22
 }
 
-pub trait Message: serde::Serialize {
+pub trait Message: Serialize {
     fn from_slice<'a>(slice: &'a Vec<u8>) -> Result<Self, Error>
     where
         Self: Sized + Deserialize<'a>,
@@ -75,20 +73,20 @@ pub trait Message: serde::Serialize {
     }
 }
 
-impl Message for Request {}
+impl<T: Serialize> Message for Request<T> {}
 impl Message for Response {}
 
 #[derive(Debug)]
-pub struct HandlerRequest<T, U> {
+pub struct ServerHandler<T, U> {
     pub stream: UnixStream,
-    pub req: T,
+    pub req: Request<T>,
     pub ret: Vec<U>,
 }
 
 pub trait Handle<T, U> {
-    fn new(stream: UnixStream, req: T) -> HandlerRequest<T, U> {
+    fn new(stream: UnixStream, req: Request<T>) -> ServerHandler<T, U> {
         let ret: Vec<U> = Vec::new();
-        HandlerRequest { stream, req, ret }
+        ServerHandler { stream, req, ret }
     }
 
     fn handle(&self, server_config: &ServerConfig) -> Result<(), Error>;

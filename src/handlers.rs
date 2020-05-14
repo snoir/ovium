@@ -7,10 +7,10 @@ use std::io::{BufWriter, Write};
 use std::sync::mpsc::{self, channel};
 use std::sync::Arc;
 
-impl Handle<CmdRequest, CmdReturn> for HandlerRequest<CmdRequest, CmdReturn> {
+impl Handle<CmdRequest, CmdReturn> for ServerHandler<CmdRequest, CmdReturn> {
     fn handle(&self, server_config: &ServerConfig) -> Result<(), Error> {
-        let nodes = &self.req.nodes;
-        let cmd = &self.req.command;
+        let nodes = &self.req.0.nodes;
+        let cmd = &self.req.0.command;
         let (tx, rx) = channel();
         let nodes_nb = nodes.len();
         info!(
