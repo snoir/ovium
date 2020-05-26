@@ -15,6 +15,12 @@ pub struct CmdReturn {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CmdRequest {
+    pub nodes: Vec<String>,
+    pub command: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum SshReturn {
     SshSuccess(SshSuccess),
     SshFailure(String),
@@ -33,12 +39,8 @@ pub enum Response {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Request<T>(pub T);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CmdRequest {
-    pub nodes: Vec<String>,
-    pub command: String,
+pub enum Request {
+    Cmd(CmdRequest),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,23 +75,34 @@ pub trait Message: Serialize {
     }
 }
 
-impl<T: Serialize> Message for Request<T> {}
+impl Message for Request {}
 impl Message for Response {}
 
 #[derive(Debug)]
-pub struct ServerHandler<T, U> {
+pub struct ServerHandler<T> {
     pub stream: UnixStream,
-    pub req: Request<T>,
-    pub ret: Vec<U>,
+    pub req: T,
 }
 
-pub trait Handle<T, U> {
-    fn new(stream: UnixStream, req: Request<T>) -> ServerHandler<T, U> {
-        let ret: Vec<U> = Vec::new();
-        ServerHandler { stream, req, ret }
+pub trait ServerHandle<T> {
+    fn new(stream: UnixStream, req: T) -> ServerHandler<T> {
+        ServerHandler { stream, req }
     }
 
-    fn handle(&self, server_config: &ServerConfig) -> Result<(), Error>;
+    fn handle(self, server_config: &ServerConfig) -> Result<(), Error>;
+}
+
+#[derive(Debug)]
+pub struct ClientHandler<T> {
+    pub response: T,
+}
+
+pub trait ClientHandle<T> {
+    fn new(response: T) -> ClientHandler<T> {
+        ClientHandler { response }
+    }
+
+    fn handle(self) -> Result<(), Error>;
 }
 
 impl Display for CmdReturn {

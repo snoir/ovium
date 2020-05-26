@@ -7,10 +7,20 @@ use std::io::{BufWriter, Write};
 use std::sync::mpsc::{self, channel};
 use std::sync::Arc;
 
-impl Handle<CmdRequest, CmdReturn> for ServerHandler<CmdRequest, CmdReturn> {
-    fn handle(&self, server_config: &ServerConfig) -> Result<(), Error> {
-        let nodes = &self.req.0.nodes;
-        let cmd = &self.req.0.command;
+impl ServerHandle<Request> for ServerHandler<Request> {
+    fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
+        match self.req {
+            Request::Cmd(inner_req) => {
+                ServerHandler::<CmdRequest>::new(self.stream, inner_req).handle(server_config)
+            }
+        }
+    }
+}
+
+impl ServerHandle<CmdRequest> for ServerHandler<CmdRequest> {
+    fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
+        let nodes = &self.req.nodes;
+        let cmd = &self.req.command;
         let (tx, rx) = channel();
         let nodes_nb = nodes.len();
         info!(
@@ -64,10 +74,28 @@ impl Handle<CmdRequest, CmdReturn> for ServerHandler<CmdRequest, CmdReturn> {
             }
         }
 
-        let cmd_response: Response = Response::Cmd(results);
+        let cmd_response = Response::Cmd(results);
 
         let mut writer = BufWriter::new(&self.stream);
         writer.write_all(&cmd_response.format_bytes()?)?;
+
+        Ok(())
+    }
+}
+
+impl ClientHandle<Response> for ClientHandler<Response> {
+    fn handle(self) -> Result<(), Error> {
+        match self.response {
+            Response::Cmd(inner_resp) => ClientHandler::<Vec<CmdReturn>>::new(inner_resp).handle(),
+        }
+    }
+}
+
+impl ClientHandle<Vec<CmdReturn>> for ClientHandler<Vec<CmdReturn>> {
+    fn handle(self) -> Result<(), Error> {
+        for cmd_return in self.response {
+            println!("{}", cmd_return);
+        }
 
         Ok(())
     }

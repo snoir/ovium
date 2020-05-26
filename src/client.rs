@@ -1,39 +1,87 @@
-use crate::error::Error;
+use crate::error::{Error, OviumError};
 use crate::types::*;
+use getopts::Options;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
+use std::process;
 
 pub struct Client<'a> {
     pub socket_path: &'a str,
-    pub request: Request<CmdRequest>,
 }
 
 impl Client<'_> {
-    pub fn run(&self) -> Result<(), Error> {
-        let stream = UnixStream::connect(&self.socket_path)?;
+    pub fn new(socket_path: &str) -> Result<Client, OviumError> {
+        Ok(Client { socket_path })
+    }
+
+    pub fn run(self, request: Request) -> Result<Response, Error> {
+        let stream = UnixStream::connect(self.socket_path)?;
         let mut reader = BufReader::new(&stream);
         let mut writer = BufWriter::new(&stream);
 
         let mut resp = Vec::new();
-        writer.write_all(&self.request.format_bytes()?)?;
+        writer.write_all(&request.format_bytes()?)?;
         writer.flush()?;
         reader.read_until(b'\n', &mut resp)?;
 
-        self.handle_cmd(resp)?;
+        let response = Response::from_slice(&resp)?;
 
-        Ok(())
+        Ok(response)
+    }
+}
+
+pub struct Cli {
+    opts: getopts::Options,
+    args: Vec<String>,
+}
+
+impl Cli {
+    pub fn new(args: Vec<String>) -> Cli {
+        let mut opts = Options::new();
+        opts.optopt("s", "", "server socket path", "sock");
+        opts.optopt("c", "", "remote command to launch", "command");
+        opts.optopt("n", "", "nodes to manage", "nodes");
+        opts.optflag("h", "help", "print this help menu");
+
+        Cli { opts, args }
     }
 
-    fn handle_cmd(&self, resp: Vec<u8>) -> Result<(), Error> {
-        let cmd_response = Response::from_slice(&resp)?;
-        match cmd_response {
-            Response::Cmd(results) => {
-                for result in results.iter() {
-                    println!("{}", result);
-                }
-            }
+    pub fn parse(&self) -> (String, Request) {
+        let program_name = self.args[0].clone();
+        let matches = match self.opts.parse(&self.args[1..]) {
+            Ok(m) => m,
+            Err(f) => panic!(f.to_string()),
+        };
+
+        if matches.opt_present("h") || self.args.len() < 2 {
+            print_usage(&program_name, &self.opts);
+            process::exit(0);
         }
 
-        Ok(())
+        let socket_path = match matches.opt_str("s") {
+            Some(s) => s,
+            None => {
+                eprintln!("socket path is required!");
+                process::exit(1);
+            }
+        };
+
+        if let Some(c) = matches.opt_str("c") {
+            if let Some(n) = matches.opt_str("n") {
+                let nodes: Vec<String> = n.split(',').map(String::from).collect();
+                let request = Request::Cmd(CmdRequest { nodes, command: c });
+                return (socket_path, request);
+            } else {
+                eprintln!("nodes list is required!");
+                process::exit(1);
+            }
+        } else {
+            process::exit(1);
+        }
     }
+}
+
+fn print_usage(program: &str, opts: &Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
 }
