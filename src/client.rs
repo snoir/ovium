@@ -1,4 +1,4 @@
-use crate::error::{Error, OviumError};
+use crate::error::Error;
 use crate::types::*;
 use getopts::Options;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -10,8 +10,8 @@ pub struct Client<'a> {
 }
 
 impl Client<'_> {
-    pub fn new(socket_path: &str) -> Result<Client, OviumError> {
-        Ok(Client { socket_path })
+    pub fn new(socket_path: &str) -> Client {
+        Client { socket_path }
     }
 
     pub fn run(self, request: Request) -> Result<Response, Error> {

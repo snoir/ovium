@@ -28,6 +28,7 @@ pub enum ErrorKind {
     LoadConfig,
     Handle,
     Bind,
+    ClientRun,
 }
 
 impl fmt::Display for Error {
@@ -57,6 +58,7 @@ impl fmt::Display for OviumError {
             ErrorKind::LoadConfig => writeln!(f, "Failed to load configuration"),
             ErrorKind::Handle => writeln!(f, "Handle error"),
             ErrorKind::Bind => writeln!(f, "Error while binding socket"),
+            ErrorKind::ClientRun => writeln!(f, "Error running Ovium client"),
         }?;
 
         if let Some(detail) = &self.detail {
