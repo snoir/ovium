@@ -61,7 +61,7 @@ fn default_port() -> u32 {
 }
 
 pub trait Message: Serialize {
-    fn from_slice<'a>(slice: &'a Vec<u8>) -> Result<Self, Error>
+    fn from_slice<'a>(slice: &'a [u8]) -> Result<Self, Error>
     where
         Self: Sized + Deserialize<'a>,
     {

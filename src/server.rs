@@ -60,7 +60,7 @@ impl Server<'_> {
             });
 
             for stream in self.listener.incoming() {
-                if let Ok(_) = signal_receiver.clone().try_recv() {
+                if signal_receiver.clone().try_recv().is_ok() {
                     break;
                 }
 
@@ -173,7 +173,7 @@ impl ServerConfig {
             Ok(config_string) => config_string,
             Err(err) => {
                 error!("Unable to load file {:?}: {}", &nodes_file_path, err);
-                return Err(OviumError::from((ErrorKind::LoadConfig, err.into())));
+                return Err(OviumError::from((ErrorKind::LoadConfig, err)));
             }
         };
 
@@ -197,7 +197,7 @@ fn validate_config(config: &ServerConfig) -> Result<(), ConfigError> {
         }
     }
 
-    if unknown_nodes.len() > 0 {
+    if !unknown_nodes.is_empty() {
         return Err(ConfigError::UnknownNodes(unknown_nodes));
     }
 

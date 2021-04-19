@@ -1,10 +1,9 @@
 use getopts::Options;
-use ovium::error::OviumError;
 use ovium::server::Server;
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use std::{env, process};
 
-fn main() -> Result<(), OviumError> {
+fn main() {
     match TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed) {
         Ok(_) => (),
         Err(err) => eprintln!("Failed while setting up logger: {}", err),
@@ -17,7 +16,7 @@ fn main() -> Result<(), OviumError> {
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
-        Err(f) => panic!(f.to_string()),
+        Err(f) => panic!("{}", f.to_string()),
     };
 
     if matches.opt_present("h") {
@@ -40,8 +39,6 @@ fn main() -> Result<(), OviumError> {
     } else {
         println!("socket option is required!");
     }
-
-    Ok(())
 }
 
 fn print_usage(program: &str, opts: &Options) {

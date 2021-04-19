@@ -50,7 +50,7 @@ impl Cli {
         let program_name = self.args[0].clone();
         let matches = match self.opts.parse(&self.args[1..]) {
             Ok(m) => m,
-            Err(f) => panic!(f.to_string()),
+            Err(f) => panic!("{}", f.to_string()),
         };
 
         if matches.opt_present("h") || self.args.len() < 2 {
@@ -70,7 +70,7 @@ impl Cli {
             if let Some(n) = matches.opt_str("n") {
                 let nodes: Vec<String> = n.split(',').map(String::from).collect();
                 let request = Request::Cmd(CmdRequest { nodes, command: c });
-                return (socket_path, request);
+                (socket_path, request)
             } else {
                 eprintln!("nodes list is required!");
                 process::exit(1);

@@ -15,7 +15,7 @@ fn main() -> Result<(), OviumError> {
     let (socket_path, request) = cli.parse();
     let response = Client::new(&socket_path)
         .run(request)
-        .map_err(|err| (ErrorKind::ClientRun, err.into()))?;
+        .map_err(|err| (ErrorKind::ClientRun, err))?;
     let handler = ClientHandler::new(response);
     handler.handle().unwrap();
 
