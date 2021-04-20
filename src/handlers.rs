@@ -7,7 +7,7 @@ use std::io::{BufWriter, Write};
 use std::sync::mpsc::{self, channel};
 use std::sync::Arc;
 
-impl ServerHandle<Request> for ServerHandler<Request> {
+impl ServerActions<Request> for ServerHandler<Request> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
         match self.req {
             Request::Cmd(inner_req) => {
@@ -17,7 +17,7 @@ impl ServerHandle<Request> for ServerHandler<Request> {
     }
 }
 
-impl ServerHandle<CmdRequest> for ServerHandler<CmdRequest> {
+impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
         let nodes = &self.req.nodes;
         let cmd = &self.req.command;
@@ -83,7 +83,7 @@ impl ServerHandle<CmdRequest> for ServerHandler<CmdRequest> {
     }
 }
 
-impl ClientHandle<Response> for ClientHandler<Response> {
+impl ClientActions<Response> for ClientHandler<Response> {
     fn handle(self) -> Result<(), Error> {
         match self.response {
             Response::Cmd(inner_resp) => ClientHandler::<Vec<CmdReturn>>::new(inner_resp).handle(),
@@ -91,7 +91,7 @@ impl ClientHandle<Response> for ClientHandler<Response> {
     }
 }
 
-impl ClientHandle<Vec<CmdReturn>> for ClientHandler<Vec<CmdReturn>> {
+impl ClientActions<Vec<CmdReturn>> for ClientHandler<Vec<CmdReturn>> {
     fn handle(self) -> Result<(), Error> {
         for cmd_return in self.response {
             println!("{}", cmd_return);

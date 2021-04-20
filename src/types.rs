@@ -84,7 +84,7 @@ pub struct ServerHandler<T> {
     pub req: T,
 }
 
-pub trait ServerHandle<T> {
+pub trait ServerActions<T> {
     #[allow(clippy::new_ret_no_self)]
     fn new(stream: UnixStream, req: T) -> ServerHandler<T> {
         ServerHandler { stream, req }
@@ -98,7 +98,7 @@ pub struct ClientHandler<T> {
     pub response: T,
 }
 
-pub trait ClientHandle<T> {
+pub trait ClientActions<T> {
     #[allow(clippy::new_ret_no_self)]
     fn new(response: T) -> ClientHandler<T> {
         ClientHandler { response }
