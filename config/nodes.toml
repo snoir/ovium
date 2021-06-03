@@ -1,0 +1,7 @@
+[nodes]
+civil-pig = { ip = "10.207.201.136", port = 22 }
+thorough-beetle = { ip = "10.207.201.137", port = 22 }
+
+[groups]
+web = ["civil-pig", "thorough-beetle"]
+db = ["civil-pig"]

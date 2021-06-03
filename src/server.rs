@@ -29,7 +29,7 @@ pub struct ServerConfig {
 
 impl Server<'_> {
     pub fn new(socket_path: &str) -> Result<Server, OviumError> {
-        let config_path = Path::new("/home/samir/git/ovium-config");
+        let config_path = Path::new("config");
         let server_config = ServerConfig::new(config_path)?;
         let listener =
             UnixListener::bind(socket_path).map_err(|err| (ErrorKind::Bind, err.into()))?;
