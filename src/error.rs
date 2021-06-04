@@ -7,6 +7,7 @@ pub enum Error {
     Io(io::Error),
     Json(serde_json::Error),
     ConfigError(ConfigError),
+    RequestError(RequestError),
 }
 
 #[derive(Debug)]
@@ -20,6 +21,11 @@ pub struct OviumError {
 pub enum ConfigError {
     UnknownNodes(Vec<String>),
     Parse(toml::de::Error),
+}
+
+#[derive(Debug)]
+pub enum RequestError {
+    UnknownNodes(Vec<String>),
 }
 
 #[derive(Debug)]
@@ -38,6 +44,7 @@ impl fmt::Display for Error {
             Error::Ssh(err) => write!(f, "Ssh error: {}", err),
             Error::Json(err) => write!(f, "Json error: {}", err),
             Error::ConfigError(err) => write!(f, "{}", err),
+            Error::RequestError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -46,7 +53,15 @@ impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ConfigError::Parse(err) => write!(f, "Parsing error: {}", err),
-            ConfigError::UnknownNodes(err) => write!(f, "Unkown nodes: '{}'", err.join(", ")),
+            ConfigError::UnknownNodes(err) => write!(f, "Unknown nodes: '{}'", err.join(", ")),
+        }
+    }
+}
+
+impl fmt::Display for RequestError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RequestError::UnknownNodes(err) => write!(f, "Unknown nodes: '{}'", err.join(", ")),
         }
     }
 }
@@ -99,6 +114,12 @@ impl From<serde_json::Error> for Error {
 impl From<ConfigError> for Error {
     fn from(error: ConfigError) -> Self {
         Error::ConfigError(error)
+    }
+}
+
+impl From<RequestError> for Error {
+    fn from(error: RequestError) -> Self {
+        Error::RequestError(error)
     }
 }
 
