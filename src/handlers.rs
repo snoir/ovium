@@ -7,16 +7,6 @@ use std::io::{BufWriter, Write};
 use std::sync::mpsc::{self, channel};
 use std::sync::Arc;
 
-impl ServerActions<Request> for ServerHandler<Request> {
-    fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
-        match self.req {
-            Request::Cmd(inner_req) => {
-                ServerHandler::<CmdRequest>::new(self.stream, inner_req).handle(server_config)
-            }
-        }
-    }
-}
-
 impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
         let nodes = &self.req.nodes;

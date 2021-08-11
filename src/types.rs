@@ -84,12 +84,13 @@ pub struct ServerHandler<T> {
     pub req: T,
 }
 
-pub trait ServerActions<T> {
-    #[allow(clippy::new_ret_no_self)]
-    fn new(stream: UnixStream, req: T) -> ServerHandler<T> {
-        ServerHandler { stream, req }
+impl<T> ServerHandler<T> {
+    pub fn new(stream: UnixStream, req: T) -> ServerHandler<T> {
+        ServerHandler::<T> { stream, req }
     }
+}
 
+pub trait ServerActions<T> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error>;
 }
 
