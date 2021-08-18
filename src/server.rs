@@ -181,11 +181,11 @@ impl ServerConfig {
             }
         };
 
-        let nodes: ServerConfig = toml::from_str(&nodes_config_string)
+        let config: ServerConfig = toml::from_str(&nodes_config_string)
             .map_err(|err| (ErrorKind::InvalidConfig, ConfigError::Parse(err).into()))?;
-        validate_config(&nodes).map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
+        validate_config(&config).map_err(|err| (ErrorKind::InvalidConfig, err.into()))?;
 
-        Ok(nodes)
+        Ok(config)
     }
 }
 
