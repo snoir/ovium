@@ -106,7 +106,6 @@ impl Server<'_> {
                 Ok(read_bytes) => {
                     if read_bytes == 0 {
                         info!("connection closed by remote");
-                        break;
                     } else {
                         let recv_request = Request::from_slice(&resp)?;
                         let handler = match recv_request {
@@ -116,8 +115,8 @@ impl Server<'_> {
                         };
                         handler.validate_request(&self.config)?;
                         handler.handle(&self.config)?;
-                        break;
                     };
+                    break;
                 }
                 Err(err) => match err.kind() {
                     io::ErrorKind::Interrupted => continue,

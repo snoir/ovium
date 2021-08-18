@@ -65,7 +65,7 @@ pub trait Message: Serialize {
     where
         Self: Sized + Deserialize<'a>,
     {
-        let response = serde_json::from_slice(&slice)?;
+        let response = serde_json::from_slice(slice)?;
         Ok(response)
     }
 
