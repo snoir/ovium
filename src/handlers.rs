@@ -2,7 +2,7 @@ use crate::error::{Error, RequestError};
 use crate::server::*;
 use crate::types::*;
 use crossbeam_utils::thread;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::io::{BufWriter, Write};
 use std::sync::mpsc::{self, channel};
 use std::sync::Arc;
@@ -77,6 +77,26 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
 
         let mut writer = BufWriter::new(&self.stream);
         writer.write_all(&cmd_response.format_bytes()?)?;
+
+        Ok(())
+    }
+
+    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError> {
+        let not_in_config: Vec<String> = self
+            .req
+            .nodes
+            .iter()
+            .cloned()
+            .filter(|n| !server_config.nodes.contains_key(n))
+            .collect();
+
+        if !not_in_config.is_empty() {
+            error!(
+                "Some nodes are not in config: [{}]",
+                not_in_config.join(", ")
+            );
+            return Err(RequestError::UnknownNodes(not_in_config));
+        }
 
         Ok(())
     }

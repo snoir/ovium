@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Error, RequestError};
 use crate::server::ServerConfig;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -92,6 +92,8 @@ impl<T> ServerHandler<T> {
 
 pub trait ServerActions<T> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error>;
+
+    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError>;
 }
 
 #[derive(Debug)]

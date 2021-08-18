@@ -114,6 +114,7 @@ impl Server<'_> {
                                 ServerHandler::<CmdRequest>::new(stream, inner_req)
                             }
                         };
+                        handler.validate_request(&self.config)?;
                         handler.handle(&self.config)?;
                         break;
                     };
