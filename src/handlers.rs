@@ -82,7 +82,7 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     }
 
     fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError> {
-        let not_in_config: Vec<String> = self
+        let mut not_in_config: Vec<String> = self
             .req
             .nodes
             .iter()
@@ -90,9 +90,20 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
             .filter(|n| !server_config.nodes.contains_key(n))
             .collect();
 
+        if let Some(groups) = &server_config.groups {
+            not_in_config.extend(
+                self.req
+                    .nodes
+                    .iter()
+                    .cloned()
+                    .filter(|n| !groups.contains_key(n))
+                    .collect::<Vec<String>>(),
+            );
+        }
+
         if !not_in_config.is_empty() {
             error!(
-                "Some nodes are not in config: [{}]",
+                "Some nodes or groups are unknown (not in config): [{}]",
                 not_in_config.join(", ")
             );
             return Err(RequestError::UnknownNodes(not_in_config));
