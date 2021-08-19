@@ -82,24 +82,23 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     }
 
     fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError> {
-        let mut not_in_config: Vec<String> = self
+        let available_names = &mut server_config
+            .nodes
+            .keys()
+            .into_iter()
+            .collect::<Vec<&String>>();
+
+        if let Some(groups) = &server_config.groups {
+            available_names.extend(groups.keys().into_iter().collect::<Vec<&String>>());
+        }
+
+        let not_in_config: Vec<String> = self
             .req
             .nodes
             .iter()
             .cloned()
-            .filter(|n| !server_config.nodes.contains_key(n))
+            .filter(|n| !available_names.contains(&n))
             .collect();
-
-        if let Some(groups) = &server_config.groups {
-            not_in_config.extend(
-                self.req
-                    .nodes
-                    .iter()
-                    .cloned()
-                    .filter(|n| !groups.contains_key(n))
-                    .collect::<Vec<String>>(),
-            );
-        }
 
         if !not_in_config.is_empty() {
             error!(
