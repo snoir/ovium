@@ -72,7 +72,7 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
         Ok(())
     }
 
-    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError> {
+    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), Error> {
         let available_names = &mut server_config
             .nodes
             .keys()
@@ -96,7 +96,13 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
                 "Some nodes or groups are unknown (not in config): [{}]",
                 not_in_config.join(", ")
             );
-            return Err(RequestError::UnknownNodes(not_in_config));
+
+            let error_response =
+                Response::Error(ResponseError::UnknownNodes(not_in_config.clone()));
+            let mut writer = BufWriter::new(&self.stream);
+            writer.write_all(&error_response.format_bytes()?)?;
+
+            return Err(Error::from(RequestError::UnknownNodes(not_in_config)));
         }
 
         Ok(())
@@ -107,6 +113,7 @@ impl ClientActions<Response> for ClientHandler<Response> {
     fn handle(self) -> Result<(), Error> {
         match self.response {
             Response::Cmd(inner_resp) => ClientHandler::<Vec<CmdReturn>>::new(inner_resp).handle(),
+            Response::Error(inner_resp) => ClientHandler::<ResponseError>::new(inner_resp).handle(),
         }
     }
 }
@@ -116,6 +123,14 @@ impl ClientActions<Vec<CmdReturn>> for ClientHandler<Vec<CmdReturn>> {
         for cmd_return in self.response {
             println!("{}", cmd_return);
         }
+
+        Ok(())
+    }
+}
+
+impl ClientActions<ResponseError> for ClientHandler<ResponseError> {
+    fn handle(self) -> Result<(), Error> {
+        println!("{}", &self.response);
 
         Ok(())
     }

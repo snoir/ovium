@@ -1,4 +1,4 @@
-use crate::error::{Error, RequestError};
+use crate::error::Error;
 use crate::server::ServerConfig;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -36,11 +36,17 @@ pub struct SshSuccess {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Response {
     Cmd(Vec<CmdReturn>),
+    Error(ResponseError),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
     Cmd(CmdRequest),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ResponseError {
+    UnknownNodes(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -93,7 +99,7 @@ impl<T> ServerHandler<T> {
 pub trait ServerActions<T> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error>;
 
-    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), RequestError>;
+    fn validate_request(&self, server_config: &ServerConfig) -> Result<(), Error>;
 }
 
 #[derive(Debug)]
@@ -143,5 +149,19 @@ impl Display for CmdReturn {
                 write!(f, "{}", NC)
             }
         }
+    }
+}
+
+impl Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", RED)?;
+        match &self {
+            ResponseError::UnknownNodes(ukn_nodes) => write!(
+                f,
+                "ERROR: Unknown nodes or groups: [{}]",
+                ukn_nodes.join(", ")
+            )?,
+        };
+        write!(f, "{}", NC)
     }
 }
