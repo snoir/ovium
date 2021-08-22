@@ -27,6 +27,25 @@ pub struct ServerConfig {
     pub groups: Option<HashMap<String, Vec<String>>>,
 }
 
+impl ServerConfig {
+    pub fn is_group(&self, name: &str) -> bool {
+        if let Some(groups) = &self.groups {
+            groups.contains_key(name)
+        } else {
+            false
+        }
+    }
+
+    pub fn group_members(&self, name: &str) -> Vec<String> {
+        let mut result: Vec<String> = Vec::new();
+        if let Some(groups) = &self.groups {
+            result.extend(groups[name].clone());
+        }
+
+        result
+    }
+}
+
 impl Server<'_> {
     pub fn new(socket_path: &str) -> Result<Server, OviumError> {
         let config_path = Path::new("config");

@@ -9,7 +9,19 @@ use std::sync::Arc;
 
 impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
-        let nodes = &self.req.nodes;
+        // Can't use a Vec<&String> because of later join()
+        // Might be a bug: https://github.com/rust-lang/rust/issues/82910
+        let mut nodes: Vec<String> = Vec::new();
+        for node in &self.req.nodes {
+            if server_config.is_group(node) {
+                nodes.extend(server_config.group_members(node));
+            } else {
+                nodes.push(node.to_string());
+            }
+        }
+        nodes.sort();
+        nodes.dedup();
+
         let cmd = &self.req.command;
         let (tx, rx) = channel();
         let nodes_nb = nodes.len();
