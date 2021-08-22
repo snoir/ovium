@@ -19,15 +19,6 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
             nodes.join(", ")
         );
         let server_config = Arc::new(&server_config);
-        let not_in_config: Vec<String> = nodes
-            .iter()
-            .cloned()
-            .filter(|n| !server_config.nodes.contains_key(n))
-            .collect();
-
-        if !not_in_config.is_empty() {
-            return Err(RequestError::UnknownNodes(not_in_config).into());
-        }
 
         thread::scope(move |s| {
             let mut threads = Vec::new();
