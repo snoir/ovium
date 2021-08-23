@@ -24,25 +24,13 @@ pub struct Server<'a> {
 #[derive(Deserialize, Debug)]
 pub struct ServerConfig {
     pub nodes: HashMap<String, Node>,
-    pub groups: Option<HashMap<String, Vec<String>>>,
+    #[serde(default)]
+    pub groups: HashMap<String, Vec<String>>,
 }
 
 impl ServerConfig {
     pub fn is_group(&self, name: &str) -> bool {
-        if let Some(groups) = &self.groups {
-            groups.contains_key(name)
-        } else {
-            false
-        }
-    }
-
-    pub fn group_members(&self, name: &str) -> Vec<String> {
-        let mut result: Vec<String> = Vec::new();
-        if let Some(groups) = &self.groups {
-            result.extend(groups[name].clone());
-        }
-
-        result
+        self.groups.contains_key(name)
     }
 }
 
@@ -210,12 +198,10 @@ impl ServerConfig {
 
 fn validate_config(config: &ServerConfig) -> Result<(), ConfigError> {
     let mut unknown_nodes: Vec<String> = Vec::new();
-    if let Some(groups) = &config.groups {
-        for node_group in groups {
-            for node in node_group.1 {
-                if !config.nodes.contains_key(node) {
-                    unknown_nodes.push(node.to_string());
-                }
+    for node_group in &config.groups {
+        for node in node_group.1 {
+            if !config.nodes.contains_key(node) {
+                unknown_nodes.push(node.to_string());
             }
         }
     }

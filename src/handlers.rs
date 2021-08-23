@@ -9,14 +9,14 @@ use std::sync::Arc;
 
 impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
     fn handle(self, server_config: &ServerConfig) -> Result<(), Error> {
-        // Can't use a Vec<&String> because of later join()
-        // Might be a bug: https://github.com/rust-lang/rust/issues/82910
-        let mut nodes: Vec<String> = Vec::new();
+        let mut nodes: Vec<&String> = Vec::new();
         for node in &self.req.nodes {
             if server_config.is_group(node) {
-                nodes.extend(server_config.group_members(node));
+                if let Some(members) = server_config.groups.get(node) {
+                    &nodes.extend(members);
+                }
             } else {
-                nodes.push(node.to_string());
+                nodes.push(&node);
             }
         }
         nodes.sort();
@@ -25,11 +25,9 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
         let cmd = &self.req.command;
         let (tx, rx) = channel();
         let nodes_nb = nodes.len();
-        info!(
-            "Received command '{}' for nodes: [{}]",
-            cmd,
-            nodes.join(", ")
-        );
+        // Can't use join() on Vec<&String>
+        // Might be a bug: https://github.com/rust-lang/rust/issues/82910
+        info!("Received command '{}' for nodes: {:?}", cmd, nodes);
         let server_config = Arc::new(&server_config);
 
         thread::scope(move |s| {
@@ -91,9 +89,13 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
             .into_iter()
             .collect::<Vec<&String>>();
 
-        if let Some(groups) = &server_config.groups {
-            available_names.extend(groups.keys().into_iter().collect::<Vec<&String>>());
-        }
+        available_names.extend(
+            server_config
+                .groups
+                .keys()
+                .into_iter()
+                .collect::<Vec<&String>>(),
+        );
 
         let not_in_config: Vec<String> = self
             .req
