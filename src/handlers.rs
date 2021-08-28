@@ -13,10 +13,10 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
         for node in &self.req.nodes {
             if server_config.is_group(node) {
                 if let Some(members) = server_config.groups.get(node) {
-                    &nodes.extend(members);
+                    nodes.extend(members);
                 }
             } else {
-                nodes.push(&node);
+                nodes.push(node);
             }
         }
         nodes.sort();
