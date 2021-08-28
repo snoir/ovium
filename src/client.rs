@@ -20,11 +20,11 @@ impl Client<'_> {
         let mut writer = BufWriter::new(&stream);
 
         let mut resp = Vec::new();
-        writer.write_all(&request.format_bytes()?)?;
+        writer.write_all(&request.encode()?)?;
         writer.flush()?;
         reader.read_until(b'\n', &mut resp)?;
 
-        let response = Response::from_slice(&resp)?;
+        let response = Response::decode(&resp)?;
 
         Ok(response)
     }

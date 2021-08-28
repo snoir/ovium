@@ -67,17 +67,17 @@ fn default_port() -> u32 {
 }
 
 pub trait Message: Serialize {
-    fn from_slice<'a>(slice: &'a [u8]) -> Result<Self, Error>
+    fn decode<'a>(slice: &'a [u8]) -> Result<Self, Error>
     where
         Self: Sized + Deserialize<'a>,
     {
-        let response = serde_json::from_slice(slice)?;
-        Ok(response)
+        Ok(bincode::deserialize(slice)?)
     }
 
-    fn format_bytes(&self) -> Result<Vec<u8>, Error> {
-        let slice = format!("{}\n", serde_json::to_string(&self)?);
-        Ok(slice.as_bytes().to_vec())
+    fn encode(&self) -> Result<Vec<u8>, Error> {
+        let mut message = bincode::serialize(&self)?;
+        message.extend("\n".as_bytes());
+        Ok(message)
     }
 }
 

@@ -77,7 +77,7 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
         let cmd_response = Response::Cmd(results);
 
         let mut writer = BufWriter::new(&self.stream);
-        writer.write_all(&cmd_response.format_bytes()?)?;
+        writer.write_all(&cmd_response.encode()?)?;
 
         Ok(())
     }
@@ -114,7 +114,7 @@ impl ServerActions<CmdRequest> for ServerHandler<CmdRequest> {
             let error_response =
                 Response::Error(ResponseError::UnknownNodes(not_in_config.clone()));
             let mut writer = BufWriter::new(&self.stream);
-            writer.write_all(&error_response.format_bytes()?)?;
+            writer.write_all(&error_response.encode()?)?;
 
             return Err(Error::from(RequestError::UnknownNodes(not_in_config)));
         }

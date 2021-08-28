@@ -114,7 +114,7 @@ impl Server<'_> {
                     if read_bytes == 0 {
                         info!("connection closed by remote");
                     } else {
-                        let recv_request = Request::from_slice(&resp)?;
+                        let recv_request = Request::decode(&resp)?;
                         let handler = match recv_request {
                             Request::Cmd(inner_req) => {
                                 ServerHandler::<CmdRequest>::new(stream, inner_req)

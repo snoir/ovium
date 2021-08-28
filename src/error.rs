@@ -6,6 +6,7 @@ pub enum Error {
     Ssh(ssh2::Error),
     Io(io::Error),
     Json(serde_json::Error),
+    Bincode(Box<bincode::ErrorKind>),
     ConfigError(ConfigError),
     RequestError(RequestError),
 }
@@ -43,6 +44,7 @@ impl fmt::Display for Error {
             Error::Io(err) => write!(f, "I/O error: {}", err),
             Error::Ssh(err) => write!(f, "Ssh error: {}", err),
             Error::Json(err) => write!(f, "Json error: {}", err),
+            Error::Bincode(err) => write!(f, "Bincode error: {}", err),
             Error::ConfigError(err) => write!(f, "{}", err),
             Error::RequestError(err) => write!(f, "{}", err),
         }
@@ -108,6 +110,12 @@ impl From<ssh2::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Self {
         Error::Json(error)
+    }
+}
+
+impl From<Box<bincode::ErrorKind>> for Error {
+    fn from(error: Box<bincode::ErrorKind>) -> Self {
+        Error::Bincode(error)
     }
 }
 
