@@ -2,4 +2,6 @@
 
 members = [
   "ovium",
+  "ovl",
+  "ovl_derive"
 ]

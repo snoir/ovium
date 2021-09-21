@@ -1,0 +1,11 @@
+[package]
+name = "ovl"
+version = "0.1.0"
+authors = ["Samir Noir <samir@noir.im>"]
+edition = "2018"
+
+[dependencies]
+peg = "0.7"
+quote = "1"
+ovl_derive = { version = "^0", path = "../ovl_derive" }
+proc-macro2 = "1"

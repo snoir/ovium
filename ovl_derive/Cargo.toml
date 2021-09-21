@@ -1,0 +1,14 @@
+[package]
+name = "ovl_derive"
+version = "0.1.0"
+authors = ["Samir Noir <samir@noir.im>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+peg = "0.6.3"
+proc-macro2 = "1"
+syn = "1"
+quote = "1"

@@ -1,0 +1,6 @@
+File "foo" {
+  path: "/tmp/foo",
+  mode: 1755,
+  owner: "root",
+  group: "root"
+}
