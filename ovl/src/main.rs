@@ -2,21 +2,16 @@ use ovl_derive::FromParsedResource;
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Debug)]
-pub enum ParsedObject {
-    Resource(ParsedResource),
-}
-
 #[derive(Debug, Clone)]
 pub struct ParsedResource {
-    resource_name: String,
+    name: String,
     resource_type: String,
     content: Vec<(String, String)>,
 }
 
 #[derive(Debug)]
 pub struct Resource {
-    resource_name: String,
+    name: String,
     resource: ResourceType,
 }
 
@@ -53,19 +48,47 @@ impl ParsedResource {
     }
 }
 
-// For later
-//pub enum AstNode {
-//    Resource(ParsedResource),
-//    Integer(i32),
-//    DoublePrecisionFloat(f64),
-//}
+#[derive(Debug)]
+pub enum Operator {
+    Plus,
+    Minus,
+}
+
+#[derive(Debug)]
+pub enum RelOperator {
+    Eq,
+    Ge,
+    Gt,
+    Le,
+    Lt,
+    Ne,
+}
+
+#[derive(Debug)]
+pub enum AstNode {
+    Resource(Resource),
+    Integer(i32),
+    Float(f64),
+    String(String),
+    IfStmt { cond: Box<Expr>, body: Vec<AstNode> },
+}
+
+#[derive(Debug)]
+pub enum Expr {
+    Rel {
+        op: RelOperator,
+        lhs: Box<AstNode>,
+        rhs: Box<AstNode>,
+    },
+}
 
 peg::parser! {
   pub grammar parser() for str {
 
-    pub rule ovl() -> Vec<ParsedObject> = _ o:resource()* _ {
+    pub rule ovl() -> Vec<AstNode> = _ o:node()* _ {
         o
     }
+
     rule _() = [' ' | '\t' | '\r' | '\n']*
 
     rule value() -> String = int() / string()
@@ -78,17 +101,19 @@ peg::parser! {
 
     rule resource_type() -> String = t:$(['A'..='Z']+ ['a'..='z']*) { t.to_string() }
 
-    rule number() = int()
+    rule number() -> String = int()
 
-    rule resource() -> ParsedObject = _ resource_type:resource_type() _ resource_name:string() _ "{" _ content:member() ** member_separator() _ "}" _ {
-        ParsedObject::Resource(
+    rule resource() -> AstNode = _ resource_type:resource_type() _ name:string() _ "{" _ content:member() ** member_separator() _ "}" _ {
+        AstNode::Resource(
             ParsedResource {
-                resource_name,
+                name,
                 resource_type,
                 content,
-            }
+            }.parse()
         )
     }
+
+    rule node() -> AstNode = resource() / if_stmt()
 
     rule member() -> (String, String) = k:key() key_value_separator() _ v:value() {
         (k, v)
@@ -97,6 +122,50 @@ peg::parser! {
     rule key_value_separator() = ":"
 
     rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
+
+    rule if_stmt() -> AstNode = "if" _ "(" _ rel_expr:expr() _ ")" _ "{" _ body:(node())* _ "}" {
+        AstNode::IfStmt { cond: Box::new(rel_expr), body: body }
+    }
+
+    rule expr() -> Expr = rel_expr_string() / rel_expr_int()
+
+    rule rel_expr_string() -> Expr = lhs:string() _ op:rel_operator() _ rhs:string() {
+        Expr::Rel {
+            op,
+            lhs: Box::new(AstNode::String(lhs)),
+            rhs: Box::new(AstNode::String(rhs)),
+        }
+    }
+
+    rule rel_expr_int() -> Expr = lhs:int() _ op:rel_operator() _ rhs:int() {
+        let lhs = lhs.parse::<i32>().unwrap();
+        let rhs = rhs.parse::<i32>().unwrap();
+        Expr::Rel {
+            op,
+            lhs: Box::new(AstNode::Integer(lhs)),
+            rhs: Box::new(AstNode::Integer(rhs)),
+        }
+    }
+
+    rule operator() -> Operator = o:$("+" / "-") {
+        match o {
+            "+" => Operator::Plus,
+            "-" => Operator::Minus,
+            _ => unreachable!()
+        }
+    }
+
+    rule rel_operator() -> RelOperator = r:$("==" / "<" / "<=" / ">" / ">=" / "!=") {
+        match r {
+            "==" => RelOperator::Eq,
+            "<" => RelOperator::Lt,
+            "<=" => RelOperator::Le,
+            ">" => RelOperator::Gt,
+            ">=" => RelOperator::Ge,
+            "!=" => RelOperator::Ne,
+            _ => unreachable!()
+        }
+    }
   }
 }
 
@@ -111,9 +180,5 @@ pub fn main() {
     ovlang_file.read_to_string(&mut ovlang_string).unwrap();
 
     let parsed_objects = parser::ovl(&ovlang_string).unwrap();
-    let object = &parsed_objects[0];
-    let resource = match object {
-        ParsedObject::Resource(res) => res.clone().parse(),
-    };
-    dbg!(resource);
+    dbg!(parsed_objects);
 }

@@ -48,7 +48,7 @@ pub fn from_parsed_resource(input: TokenStream) -> TokenStream {
                     resource.#fields_name = value_from_key(&keys, &values, &#fields_name_string).parse().unwrap();
                 )*
 
-                Resource { resource_name: parsed_resource.resource_name.clone(), resource: ResourceType::#st_name_simple_ident(resource) }
+                Resource { name: parsed_resource.name.clone(), resource: ResourceType::#st_name_simple_ident(resource) }
             }
         }
     };
