@@ -124,7 +124,7 @@ peg::parser! {
     rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
 
     rule if_stmt() -> AstNode = "if" _ "(" _ rel_expr:expr() _ ")" _ "{" _ body:(node())* _ "}" {
-        AstNode::IfStmt { cond: Box::new(rel_expr), body: body }
+        AstNode::IfStmt { cond: Box::new(rel_expr), body }
     }
 
     rule expr() -> Expr = rel_expr_string() / rel_expr_int()
