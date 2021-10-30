@@ -84,94 +84,106 @@ pub enum Expr {
 }
 
 peg::parser! {
-  pub grammar parser() for str {
+    pub grammar parser() for str {
+        pub rule ovl() -> Vec<AstNode> = _ o:node()* _ {
+            o
+        }
 
-    pub rule ovl() -> Vec<AstNode> = _ o:node()* _ {
-        o
-    }
+        rule _() = [' ' | '\t' | '\r' | '\n']*
 
-    rule _() = [' ' | '\t' | '\r' | '\n']*
+        rule value() -> String = int() / string()
 
-    rule value() -> String = int() / string()
+        rule member_separator() = _ "," _
 
-    rule member_separator() = _ "," _
+        rule string() -> String = "\"" s:$(!"\"" [_])* "\"" {
+            s.into_iter().collect()
+        }
 
-    rule string() -> String = "\"" s:$(!"\"" [_])* "\"" { s.into_iter().collect() }
+        rule unquoted_string() -> String = k:$(['a'..='z'])* {
+            k.into_iter().collect()
+        }
 
-    rule unquoted_string() -> String = k:$(['a'..='z'])* { k.into_iter().collect() }
+        rule resource_type() -> String = t:$(['A'..='Z']+ ['a'..='z']*) {
+            t.to_string()
+        }
 
-    rule resource_type() -> String = t:$(['A'..='Z']+ ['a'..='z']*) { t.to_string() }
+        rule number() -> String = int()
 
-    rule number() -> String = int()
+        rule resource() -> AstNode
+            = _ resource_type:resource_type() _ name:string() _ "{"
+              _ content:member() ** member_separator() _ "}" _ {
+            AstNode::Resource(
+                ParsedResource {
+                    name,
+                    resource_type,
+                    content,
+                }.parse()
+            )
+        }
 
-    rule resource() -> AstNode = _ resource_type:resource_type() _ name:string() _ "{" _ content:member() ** member_separator() _ "}" _ {
-        AstNode::Resource(
-            ParsedResource {
-                name,
-                resource_type,
-                content,
-            }.parse()
-        )
-    }
+        rule node() -> AstNode = resource() / if_stmt() / variable()
 
-    rule node() -> AstNode = resource() / if_stmt() / variable()
+        rule member() -> (String, String)
+            = k:unquoted_string() key_value_separator() _ v:value() {
+            (k, v)
+         }
 
-    rule member() -> (String, String) = k:unquoted_string() key_value_separator() _ v:value() {
-        (k, v)
-    }
+        rule key_value_separator() = ":"
 
-    rule key_value_separator() = ":"
+        rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
 
-    rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
+        rule if_stmt() -> AstNode
+            = "if" _ "(" _ rel_expr:expr() _ ")" _
+              "{" _ body:(node())* _ "}" _ {
+            AstNode::IfStmt { cond: Box::new(rel_expr), body }
+        }
 
-    rule if_stmt() -> AstNode = "if" _ "(" _ rel_expr:expr() _ ")" _ "{" _ body:(node())* _ "}" _ {
-        AstNode::IfStmt { cond: Box::new(rel_expr), body }
-    }
+        rule expr() -> Expr = rel_expr_string() / rel_expr_int()
 
-    rule expr() -> Expr = rel_expr_string() / rel_expr_int()
+        rule rel_expr_string() -> Expr
+            = lhs:string() _ op:rel_operator() _ rhs:string() {
+            Expr::Rel {
+                op,
+                lhs: Box::new(AstNode::String(lhs)),
+                rhs: Box::new(AstNode::String(rhs)),
+            }
+        }
 
-    rule rel_expr_string() -> Expr = lhs:string() _ op:rel_operator() _ rhs:string() {
-        Expr::Rel {
-            op,
-            lhs: Box::new(AstNode::String(lhs)),
-            rhs: Box::new(AstNode::String(rhs)),
+        rule rel_expr_int() -> Expr= lhs:int() _ op:rel_operator() _ rhs:int() {
+            let lhs = lhs.parse::<i32>().unwrap();
+            let rhs = rhs.parse::<i32>().unwrap();
+            Expr::Rel {
+                op,
+                lhs: Box::new(AstNode::Integer(lhs)),
+                rhs: Box::new(AstNode::Integer(rhs)),
+            }
+        }
+
+        rule operator() -> Operator = o:$("+" / "-") {
+            match o {
+                "+" => Operator::Plus,
+                "-" => Operator::Minus,
+                _ => unreachable!()
+            }
+        }
+
+        rule rel_operator() -> RelOperator
+            = r:$("==" / "<" / "<=" / ">" / ">=" / "!=") {
+            match r {
+                "==" => RelOperator::Eq,
+                "<" => RelOperator::Lt,
+                "<=" => RelOperator::Le,
+                ">" => RelOperator::Gt,
+                ">=" => RelOperator::Ge,
+                "!=" => RelOperator::Ne,
+                _ => unreachable!()
+            }
+        }
+
+        rule variable() -> AstNode = _ n:unquoted_string() _ "=" _ v:node() _ {
+            AstNode::Variable { name: n, body: Box::new(v) }
         }
     }
-
-    rule rel_expr_int() -> Expr = lhs:int() _ op:rel_operator() _ rhs:int() {
-        let lhs = lhs.parse::<i32>().unwrap();
-        let rhs = rhs.parse::<i32>().unwrap();
-        Expr::Rel {
-            op,
-            lhs: Box::new(AstNode::Integer(lhs)),
-            rhs: Box::new(AstNode::Integer(rhs)),
-        }
-    }
-
-    rule operator() -> Operator = o:$("+" / "-") {
-        match o {
-            "+" => Operator::Plus,
-            "-" => Operator::Minus,
-            _ => unreachable!()
-        }
-    }
-
-    rule rel_operator() -> RelOperator = r:$("==" / "<" / "<=" / ">" / ">=" / "!=") {
-        match r {
-            "==" => RelOperator::Eq,
-            "<" => RelOperator::Lt,
-            "<=" => RelOperator::Le,
-            ">" => RelOperator::Gt,
-            ">=" => RelOperator::Ge,
-            "!=" => RelOperator::Ne,
-            _ => unreachable!()
-        }
-    }
-
-    rule variable() -> AstNode = _ n:unquoted_string() _ "=" _ v:node() _ {
-        AstNode::Variable { name: n, body: Box::new(v) }
-    }
-  }
 }
 
 fn value_from_key(keys: &[String], values: &[String], v: &str) -> String {
