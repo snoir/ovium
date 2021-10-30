@@ -95,6 +95,12 @@ peg::parser! {
 
         rule member_separator() = _ "," _
 
+        rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
+
+        rule float() -> String = n:$("-"?['0'..='9']+"."['0'..='9']+) {
+            n.to_string()
+        }
+
         rule string() -> String = "\"" s:$(!"\"" [_])* "\"" {
             s.into_iter().collect()
         }
@@ -103,11 +109,21 @@ peg::parser! {
             k.into_iter().collect()
         }
 
+        rule node_string() -> AstNode = s:string() {
+            AstNode::String(s)
+        }
+
+        rule node_int() -> AstNode = s:int() {
+            AstNode::Integer(s.parse::<i32>().unwrap())
+        }
+
+        rule node_float() -> AstNode = s:float() {
+            AstNode::Float(s.parse::<f64>().unwrap())
+        }
+
         rule resource_type() -> String = t:$(['A'..='Z']+ ['a'..='z']*) {
             t.to_string()
         }
-
-        rule number() -> String = int()
 
         rule resource() -> AstNode
             = _ resource_type:resource_type() _ name:string() _ "{"
@@ -121,7 +137,9 @@ peg::parser! {
             )
         }
 
-        rule node() -> AstNode = resource() / if_stmt() / variable()
+        rule node() -> AstNode
+            = resource() / if_stmt() / variable() / node_string() /
+              node_int() / node_float()
 
         rule member() -> (String, String)
             = k:unquoted_string() key_value_separator() _ v:value() {
@@ -130,15 +148,14 @@ peg::parser! {
 
         rule key_value_separator() = ":"
 
-        rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
-
         rule if_stmt() -> AstNode
             = "if" _ "(" _ rel_expr:expr() _ ")" _
               "{" _ body:(node())* _ "}" _ {
             AstNode::IfStmt { cond: Box::new(rel_expr), body }
         }
 
-        rule expr() -> Expr = rel_expr_string() / rel_expr_int()
+        rule expr() -> Expr
+            = rel_expr_string() / rel_expr_int() / rel_expr_float()
 
         rule rel_expr_string() -> Expr
             = lhs:string() _ op:rel_operator() _ rhs:string() {
@@ -156,6 +173,17 @@ peg::parser! {
                 op,
                 lhs: Box::new(AstNode::Integer(lhs)),
                 rhs: Box::new(AstNode::Integer(rhs)),
+            }
+        }
+
+        rule rel_expr_float() -> Expr
+            = lhs:float() _ op:rel_operator() _ rhs:float() {
+            let lhs = lhs.parse::<f64>().unwrap();
+            let rhs = rhs.parse::<f64>().unwrap();
+            Expr::Rel {
+                op,
+                lhs: Box::new(AstNode::Float(lhs)),
+                rhs: Box::new(AstNode::Float(rhs)),
             }
         }
 
