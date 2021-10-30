@@ -71,6 +71,7 @@ pub enum AstNode {
     Float(f64),
     String(String),
     IfStmt { cond: Box<Expr>, body: Vec<AstNode> },
+    Variable { name: String, body: Box<AstNode> },
 }
 
 #[derive(Debug)]
@@ -97,7 +98,7 @@ peg::parser! {
 
     rule string() -> String = "\"" s:$(!"\"" [_])* "\"" { s.into_iter().collect() }
 
-    rule key() -> String = k:$(['a'..='z'])* { k.into_iter().collect() }
+    rule unquoted_string() -> String = k:$(['a'..='z'])* { k.into_iter().collect() }
 
     rule resource_type() -> String = t:$(['A'..='Z']+ ['a'..='z']*) { t.to_string() }
 
@@ -113,9 +114,9 @@ peg::parser! {
         )
     }
 
-    rule node() -> AstNode = resource() / if_stmt()
+    rule node() -> AstNode = resource() / if_stmt() / variable()
 
-    rule member() -> (String, String) = k:key() key_value_separator() _ v:value() {
+    rule member() -> (String, String) = k:unquoted_string() key_value_separator() _ v:value() {
         (k, v)
     }
 
@@ -165,6 +166,10 @@ peg::parser! {
             "!=" => RelOperator::Ne,
             _ => unreachable!()
         }
+    }
+
+    rule variable() -> AstNode = _ n:unquoted_string() _ "=" _ v:node() _ {
+        AstNode::Variable { name: n, body: Box::new(v) }
     }
   }
 }
