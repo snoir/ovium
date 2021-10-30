@@ -123,7 +123,7 @@ peg::parser! {
 
     rule int() -> String = n:$("-"?['0'..='9']+) { n.to_string() }
 
-    rule if_stmt() -> AstNode = "if" _ "(" _ rel_expr:expr() _ ")" _ "{" _ body:(node())* _ "}" {
+    rule if_stmt() -> AstNode = "if" _ "(" _ rel_expr:expr() _ ")" _ "{" _ body:(node())* _ "}" _ {
         AstNode::IfStmt { cond: Box::new(rel_expr), body }
     }
 
