@@ -64,6 +64,8 @@ pub enum RelOperator {
     Ne,
 }
 
+// Idea: it might be nice / easier at some point to split Integer, Float,
+// String and Array inside an other enum (Values ?).
 #[derive(Debug)]
 pub enum AstNode {
     Resource(Resource),
@@ -140,7 +142,7 @@ peg::parser! {
 
         rule node() -> AstNode
             = resource() / if_stmt() / variable() / node_string() /
-              node_int() / node_float() / array()
+              node_float() / node_int() / array()
 
         rule member() -> (String, String)
             = k:unquoted_string() key_value_separator() _ v:resource_value() {
@@ -156,7 +158,7 @@ peg::parser! {
         }
 
         rule expr() -> Expr
-            = rel_expr_string() / rel_expr_int() / rel_expr_float()
+            = rel_expr_string() / rel_expr_float() / rel_expr_int()
 
         rule rel_expr_string() -> Expr
             = lhs:string() _ op:rel_operator() _ rhs:string() {
@@ -213,8 +215,17 @@ peg::parser! {
             AstNode::Variable { name: n, body: Box::new(v) }
         }
 
-        pub rule array() -> AstNode
-            = "[" _ v:node() ** (_ "," _) _ "]" { AstNode::Array(v) }
+        rule array() -> AstNode
+            = "[" _ v:node() ** (_ "," _) _ "]" {
+                for (i, member) in v.iter().enumerate() {
+                    if (i > 0 && !(std::mem::discriminant(member)
+                            == std::mem::discriminant(&v[i - 1]))) {
+                        // To improve by returning Err
+                        panic!("Array members are not of the same type!");
+                    }
+                }
+                AstNode::Array(v)
+        }
     }
 }
 
