@@ -70,6 +70,7 @@ pub enum AstNode {
     Integer(i32),
     Float(f64),
     String(String),
+    Array(Vec<AstNode>),
     IfStmt { cond: Box<Expr>, body: Vec<AstNode> },
     Variable { name: String, body: Box<AstNode> },
 }
@@ -139,7 +140,7 @@ peg::parser! {
 
         rule node() -> AstNode
             = resource() / if_stmt() / variable() / node_string() /
-              node_int() / node_float()
+              node_int() / node_float() / array()
 
         rule member() -> (String, String)
             = k:unquoted_string() key_value_separator() _ v:value() {
@@ -211,6 +212,9 @@ peg::parser! {
         rule variable() -> AstNode = _ n:unquoted_string() _ "=" _ v:node() _ {
             AstNode::Variable { name: n, body: Box::new(v) }
         }
+
+        pub rule array() -> AstNode
+            = "[" _ v:node() ** (_ "," _) _ "]" { AstNode::Array(v) }
     }
 }
 
