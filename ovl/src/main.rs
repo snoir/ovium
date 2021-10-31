@@ -92,7 +92,7 @@ peg::parser! {
 
         rule _() = [' ' | '\t' | '\r' | '\n']*
 
-        rule resource_value() -> String = int() / string()
+        rule resource_value() -> String = float() / int() / string()
 
         rule member_separator() = _ "," _
 
