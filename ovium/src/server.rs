@@ -35,9 +35,8 @@ impl ServerConfig {
 }
 
 impl Server<'_> {
-    pub fn new(socket_path: &str) -> Result<Server, OviumError> {
-        let config_path = Path::new("config");
-        let server_config = ServerConfig::new(config_path)?;
+    pub fn new<'a>(socket_path: &'a str, config_path: &'a str) -> Result<Server<'a>, OviumError> {
+        let server_config = ServerConfig::new(Path::new(config_path))?;
         let listener =
             UnixListener::bind(socket_path).map_err(|err| (ErrorKind::Bind, err.into()))?;
         listener

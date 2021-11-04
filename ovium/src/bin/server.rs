@@ -13,19 +13,28 @@ fn main() {
     let program_name = &args[0];
     let mut opts = Options::new();
     opts.optopt("s", "", "socket path to listen on", "SOCK");
+    opts.optopt("c", "", "config files directory", "CONFIG-DIR");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => panic!("{}", f.to_string()),
     };
 
-    if matches.opt_present("h") {
+    if matches.opt_present("h") || args.len() < 2 {
         print_usage(program_name, &opts);
         process::exit(0);
     }
 
+    let config_path = match matches.opt_str("c") {
+        Some(c) => c,
+        None => {
+            println!("config directory option is required!");
+            process::exit(1);
+        }
+    };
+
     if let Some(s) = matches.opt_str("s") {
-        let server = match Server::new(&s) {
+        let server = match Server::new(&s, &config_path) {
             Ok(server) => server,
             Err(err) => {
                 eprintln!("{}", err);
