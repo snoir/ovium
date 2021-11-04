@@ -10,7 +10,7 @@ fn main() {
     }
 
     let args: Vec<_> = env::args().collect();
-    let program_name = args[0].clone();
+    let program_name = &args[0];
     let mut opts = Options::new();
     opts.optopt("s", "", "socket path to listen on", "SOCK");
     opts.optflag("h", "help", "print this help menu");
@@ -20,7 +20,7 @@ fn main() {
     };
 
     if matches.opt_present("h") {
-        print_usage(&program_name, &opts);
+        print_usage(program_name, &opts);
         process::exit(0);
     }
 

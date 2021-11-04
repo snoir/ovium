@@ -47,14 +47,14 @@ impl Cli {
     }
 
     pub fn parse(&self) -> (String, Request) {
-        let program_name = self.args[0].clone();
+        let program_name = &self.args[0];
         let matches = match self.opts.parse(&self.args[1..]) {
             Ok(m) => m,
             Err(f) => panic!("{}", f.to_string()),
         };
 
         if matches.opt_present("h") || self.args.len() < 2 {
-            print_usage(&program_name, &self.opts);
+            print_usage(program_name, &self.opts);
             process::exit(0);
         }
 
