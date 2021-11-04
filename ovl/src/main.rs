@@ -229,9 +229,9 @@ peg::parser! {
     }
 }
 
-fn value_from_key(keys: &[String], values: &[String], v: &str) -> String {
+fn value_from_key<'a>(keys: &'a [String], values: &'a [String], v: &'a str) -> &'a str {
     let indice = keys.iter().position(|x| x == v).unwrap();
-    values[indice].clone()
+    &values[indice]
 }
 
 pub fn main() {
