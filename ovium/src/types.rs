@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::server::ServerConfig;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{self, Display};
 use std::os::unix::net::UnixStream;
 
@@ -22,6 +22,7 @@ pub struct CmdRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SshReturn {
+    #[serde(deserialize_with = "unescape_new_line")]
     SshSuccess(SshSuccess),
     SshFailure(String),
 }
@@ -64,6 +65,22 @@ fn default_user() -> String {
 
 fn default_port() -> u32 {
     22
+}
+
+fn unescape_new_line<'de, D>(deserializer: D) -> Result<SshSuccess, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut ssh_success: SshSuccess = Deserialize::deserialize(deserializer)?;
+    if let Some(stdout) = ssh_success.stdout {
+        ssh_success.stdout = Some(stdout.replace("\\n", "\n"));
+    }
+
+    if let Some(stderr) = ssh_success.stderr {
+        ssh_success.stderr = Some(stderr.replace("\\n", "\n"));
+    }
+
+    Ok(ssh_success)
 }
 
 pub trait Message: Serialize {

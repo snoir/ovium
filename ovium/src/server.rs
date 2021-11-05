@@ -147,6 +147,8 @@ impl Server<'_> {
         channel.read_to_string(&mut stdout_string)?;
         channel.stderr().read_to_string(&mut stderr_string)?;
         channel.wait_close()?;
+        let stdout_string = stdout_string.replace("\n", "\\n");
+        let stderr_string = stderr_string.replace("\n", "\\n");
 
         let stderr = if stderr_string.is_empty() {
             None
