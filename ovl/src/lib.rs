@@ -1,6 +1,4 @@
 use ovl_derive::FromParsedResource;
-use std::fs::File;
-use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct ParsedResource {
@@ -232,13 +230,4 @@ peg::parser! {
 fn value_from_key<'a>(keys: &'a [String], values: &'a [String], v: &'a str) -> &'a str {
     let indice = keys.iter().position(|x| x == v).unwrap();
     &values[indice]
-}
-
-pub fn main() {
-    let mut ovlang_file = File::open("file1.ovl").unwrap();
-    let mut ovlang_string = String::new();
-    ovlang_file.read_to_string(&mut ovlang_string).unwrap();
-
-    let parsed_objects = parser::ovl(&ovlang_string).unwrap();
-    dbg!(parsed_objects);
 }
