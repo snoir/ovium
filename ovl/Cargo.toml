@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Samir Noir <samir@noir.im>"]
 edition = "2021"
 
+[[bin]]
+name = "ovl"
+path = "src/bin/main.rs"
+
 [dependencies]
 peg = "0.7"
 quote = "1"
